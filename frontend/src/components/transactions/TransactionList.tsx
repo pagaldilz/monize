@@ -456,6 +456,7 @@ export function TransactionList({
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.payee')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden min-[900px]:table-cell`}>{t('list.header.category')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.description')}</th>
+              <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.notes')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden 2xl:table-cell`}>{t('list.header.refNumber')}</th>
               <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden xl:table-cell`}>{t('list.header.tags')}</th>
               <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>{t('list.header.amount')}</th>
@@ -469,7 +470,7 @@ export function TransactionList({
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {transactions.map((transaction, index) => {
               const isFuture = index < futureBoundaryIndex;
-              const colCount = 10
+              const colCount = 11
                 + (selectionMode ? 1 : 0)
                 + (showRunningBalance ? 1 : 0);
               return (
