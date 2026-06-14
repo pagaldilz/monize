@@ -66,6 +66,87 @@ const AFTER_TAX_TEMPLATES = [
   'Other After-Tax Deduction',
 ];
 
+const findCategoryForTax = (templateName: string, categories: Category[]): Category | undefined => {
+  const normalizedTax = templateName.toLowerCase();
+  
+  // Define search keywords
+  let subName = '';
+  let altName = '';
+  if (normalizedTax.includes('federal')) {
+    subName = 'federal income';
+    altName = 'fed';
+  } else if (normalizedTax.includes('state')) {
+    subName = 'state income';
+    altName = 'state/provincial';
+  } else if (normalizedTax.includes('social security') || normalizedTax.includes('fica')) {
+    subName = 'social security';
+    altName = 'soc sec';
+  } else if (normalizedTax.includes('medicare')) {
+    subName = 'medicare';
+    altName = 'medicare';
+  } else if (normalizedTax.includes('disability') || normalizedTax.includes('sdi')) {
+    subName = 'state/provincial';
+    altName = 'sdi';
+  }
+
+  // 1a. Look for an exact match under "Tax" or "Taxes" for subName
+  const matchExactSub = categories.find(c => {
+    if (c.parentId) {
+      const parent = categories.find(p => p.id === c.parentId);
+      if (parent && (parent.name.toLowerCase() === 'tax' || parent.name.toLowerCase() === 'taxes')) {
+        return c.name.toLowerCase() === subName;
+      }
+    }
+    return false;
+  });
+  if (matchExactSub) return matchExactSub;
+
+  // 1b. Look for an exact match under "Tax" or "Taxes" for altName
+  const matchExactAlt = categories.find(c => {
+    if (c.parentId) {
+      const parent = categories.find(p => p.id === c.parentId);
+      if (parent && (parent.name.toLowerCase() === 'tax' || parent.name.toLowerCase() === 'taxes')) {
+        return c.name.toLowerCase() === altName;
+      }
+    }
+    return false;
+  });
+  if (matchExactAlt) return matchExactAlt;
+
+  // 1c. Look for a partial match (includes) under "Tax" or "Taxes" for subName
+  const matchPartialSub = categories.find(c => {
+    if (c.parentId) {
+      const parent = categories.find(p => p.id === c.parentId);
+      if (parent && (parent.name.toLowerCase() === 'tax' || parent.name.toLowerCase() === 'taxes')) {
+        return c.name.toLowerCase().includes(subName);
+      }
+    }
+    return false;
+  });
+  if (matchPartialSub) return matchPartialSub;
+
+  // 2. Look for any category named "Tax:Fed", "Tax:State", "Tax:Soc Sec", etc.
+  const colonMatch = categories.find(c => {
+    const name = c.name.toLowerCase();
+    return name === `tax:${subName}` || name === `tax:${altName}` || name === `tax › ${subName}` || name === `tax › ${altName}`;
+  });
+  if (colonMatch) return colonMatch;
+
+  // 3. Look for any category matching subName or altName
+  if (subName) {
+    const simpleMatch = categories.find(c => c.name.toLowerCase() === subName || c.name.toLowerCase() === altName);
+    if (simpleMatch) return simpleMatch;
+  }
+
+  // 4. Look for parent "Tax" or "Taxes"
+  const taxParent = categories.find(c => c.name.toLowerCase() === 'tax' || c.name.toLowerCase() === 'taxes');
+  if (taxParent) return taxParent;
+
+  // Fallback to first expense category if nothing else matches
+  return categories.find(c => !c.isIncome);
+};
+
+
 interface PaycheckItem {
   id: string;
   name: string;
@@ -204,13 +285,33 @@ function PaycheckWizardContent() {
       if (activeDepositAccs.length > 0) {
         setPrimaryAccountId(activeDepositAccs[0].id);
       }
+
+      // Pre-populate default taxes if we are on 'new'
+      if (selectedTemplateId === 'new') {
+        const defaultTaxesList = [
+          'Federal Tax',
+          'State Tax',
+          'Social Security (FICA)',
+          'Medicare Tax',
+          'Disability (SDI)'
+        ].map(name => {
+          const cat = findCategoryForTax(name, cats);
+          return {
+            id: Math.random().toString(),
+            name,
+            categoryId: cat?.id,
+            amount: 0,
+          };
+        });
+        setTaxes(defaultTaxesList);
+      }
     } catch (error) {
       toast.error('Failed to load payroll configuration dependencies.');
       console.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedTemplateId]);
 
   useEffect(() => {
     loadData();
@@ -224,7 +325,24 @@ function PaycheckWizardContent() {
       setMemo('Paycheck');
       setEarnings([]);
       setPreTaxDeductions([]);
-      setTaxes([]);
+      
+      const defaultTaxesList = [
+        'Federal Tax',
+        'State Tax',
+        'Social Security (FICA)',
+        'Medicare Tax',
+        'Disability (SDI)'
+      ].map(name => {
+        const cat = findCategoryForTax(name, categories);
+        return {
+          id: Math.random().toString(),
+          name,
+          categoryId: cat?.id,
+          amount: 0,
+        };
+      });
+      setTaxes(defaultTaxesList);
+
       setAfterTaxDeductions([]);
       setDepositAccounts([]);
       if (accounts.length > 0) {
