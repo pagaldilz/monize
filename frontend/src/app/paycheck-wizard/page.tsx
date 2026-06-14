@@ -931,9 +931,9 @@ function PaycheckWizardContent() {
                       <tbody>
                         {earnings.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-1 text-right font-bold text-green-600 dark:text-green-400 w-[22%] pr-4">
+                            <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="align-middle py-1 text-right font-bold text-green-600 dark:text-green-400 w-[22%] pr-4">
                               <div className="flex items-center justify-end">
                                 <span className="mr-0.5 font-bold text-green-600 dark:text-green-400">+$</span>
                                 <input
@@ -953,7 +953,7 @@ function PaycheckWizardContent() {
                                 />
                               </div>
                             </td>
-                            <td className="py-2 text-right space-x-2 w-[18%]">
+                            <td className="align-middle py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('earning', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('earning', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -999,9 +999,9 @@ function PaycheckWizardContent() {
                       <tbody>
                         {preTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                            <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
                               <div className="flex items-center justify-end">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
@@ -1021,7 +1021,7 @@ function PaycheckWizardContent() {
                                 />
                               </div>
                             </td>
-                            <td className="py-2 text-right space-x-2 w-[18%]">
+                            <td className="align-middle py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('preTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('preTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1067,9 +1067,9 @@ function PaycheckWizardContent() {
                       <tbody>
                         {taxes.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                            <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
                               <div className="flex items-center justify-end">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
@@ -1089,7 +1089,7 @@ function PaycheckWizardContent() {
                                 />
                               </div>
                             </td>
-                            <td className="py-2 text-right space-x-2 w-[18%]">
+                            <td className="align-middle py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('tax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('tax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1135,9 +1135,9 @@ function PaycheckWizardContent() {
                       <tbody>
                         {afterTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                            <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
                               <div className="flex items-center justify-end">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
@@ -1157,7 +1157,7 @@ function PaycheckWizardContent() {
                                 />
                               </div>
                             </td>
-                            <td className="py-2 text-right space-x-2 w-[18%]">
+                            <td className="align-middle py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('afterTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('afterTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1203,9 +1203,9 @@ function PaycheckWizardContent() {
                       <tbody>
                         {depositAccounts.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{getAccountName(item.accountId)}</td>
-                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{item.memo}</td>
-                            <td className="py-1 text-right font-bold w-[22%] pr-4">
+                            <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{getAccountName(item.accountId)}</td>
+                            <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{item.memo}</td>
+                            <td className="align-middle py-1 text-right font-bold w-[22%] pr-4">
                               <div className="flex items-center justify-end">
                                 {item.amount !== undefined ? (
                                   <>
@@ -1248,7 +1248,7 @@ function PaycheckWizardContent() {
                                 )}
                               </div>
                             </td>
-                            <td className="py-2 text-right space-x-2 w-[18%]">
+                            <td className="align-middle py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('deposit', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('deposit', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
