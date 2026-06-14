@@ -771,22 +771,22 @@ function PaycheckWizardContent() {
                 </button>
                 {openPanels.earnings && (
                   <div className="p-6 border-t border-gray-200 dark:border-gray-750 space-y-4">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2">Name</th>
-                          <th className="pb-2">Category</th>
-                          <th className="pb-2 text-right">Amount</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2 w-[35%]">Name</th>
+                          <th className="pb-2 w-[35%]">Category</th>
+                          <th className="pb-2 w-[15%] text-right">Amount</th>
+                          <th className="pb-2 w-[15%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {earnings.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-green-600 dark:text-green-400">+${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2">
+                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
+                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-2.5 text-right font-bold text-green-600 dark:text-green-400 w-[15%] pr-4">+${item.amount.toFixed(2)}</td>
+                            <td className="py-2.5 text-right space-x-2 w-[15%]">
                               <button onClick={() => openItemModal('earning', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('earning', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -820,22 +820,22 @@ function PaycheckWizardContent() {
                 </button>
                 {openPanels.preTax && (
                   <div className="p-6 border-t border-gray-200 dark:border-gray-750 space-y-4">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2">Name</th>
-                          <th className="pb-2">Category / Account</th>
-                          <th className="pb-2 text-right">Amount</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2 w-[35%]">Name</th>
+                          <th className="pb-2 w-[35%]">Category / Account</th>
+                          <th className="pb-2 w-[15%] text-right">Amount</th>
+                          <th className="pb-2 w-[15%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {preTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2">
+                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
+                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
+                            <td className="py-2.5 text-right space-x-2 w-[15%]">
                               <button onClick={() => openItemModal('preTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('preTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -869,22 +869,22 @@ function PaycheckWizardContent() {
                 </button>
                 {openPanels.taxes && (
                   <div className="p-6 border-t border-gray-200 dark:border-gray-750 space-y-4">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2">Name</th>
-                          <th className="pb-2">Category</th>
-                          <th className="pb-2 text-right">Amount</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2 w-[35%]">Name</th>
+                          <th className="pb-2 w-[35%]">Category</th>
+                          <th className="pb-2 w-[15%] text-right">Amount</th>
+                          <th className="pb-2 w-[15%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {taxes.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2">
+                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
+                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
+                            <td className="py-2.5 text-right space-x-2 w-[15%]">
                               <button onClick={() => openItemModal('tax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('tax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -918,22 +918,22 @@ function PaycheckWizardContent() {
                 </button>
                 {openPanels.afterTax && (
                   <div className="p-6 border-t border-gray-200 dark:border-gray-750 space-y-4">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2">Name</th>
-                          <th className="pb-2">Category / Account</th>
-                          <th className="pb-2 text-right">Amount</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2 w-[35%]">Name</th>
+                          <th className="pb-2 w-[35%]">Category / Account</th>
+                          <th className="pb-2 w-[15%] text-right">Amount</th>
+                          <th className="pb-2 w-[15%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {afterTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2">
+                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
+                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
+                            <td className="py-2.5 text-right space-x-2 w-[15%]">
                               <button onClick={() => openItemModal('afterTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('afterTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -967,24 +967,24 @@ function PaycheckWizardContent() {
                 </button>
                 {openPanels.deposits && (
                   <div className="p-6 border-t border-gray-200 dark:border-gray-750 space-y-4">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2">Account</th>
-                          <th className="pb-2">Memo</th>
-                          <th className="pb-2 text-right">Split Metric</th>
-                          <th className="pb-2 text-right">Actions</th>
+                          <th className="pb-2 w-[35%]">Account</th>
+                          <th className="pb-2 w-[35%]">Memo</th>
+                          <th className="pb-2 w-[15%] text-right">Split Metric</th>
+                          <th className="pb-2 w-[15%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {depositAccounts.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium">{getAccountName(item.accountId)}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300">{item.memo}</td>
-                            <td className="py-2.5 text-right font-bold">
+                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{getAccountName(item.accountId)}</td>
+                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{item.memo}</td>
+                            <td className="py-2.5 text-right font-bold w-[15%] pr-4">
                               {item.amount !== undefined ? `$${item.amount.toFixed(2)}` : `${item.percent}%`}
                             </td>
-                            <td className="py-2.5 text-right space-x-2">
+                            <td className="py-2.5 text-right space-x-2 w-[15%]">
                               <button onClick={() => openItemModal('deposit', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('deposit', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
