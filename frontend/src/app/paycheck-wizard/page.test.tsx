@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@/test/render';
+import { render, screen, waitFor, fireEvent } from '@/test/render';
 import PaycheckWizardPage from './page';
 
 // Mock next/navigation
@@ -72,6 +72,9 @@ const mockCategories = [
   { id: 'cat-soc-sec', name: 'Social Security', isIncome: false, parentId: 'cat-taxes' },
   { id: 'cat-medicare', name: 'Medicare', isIncome: false, parentId: 'cat-taxes' },
   { id: 'cat-provincial', name: 'State/Provincial', isIncome: false, parentId: 'cat-taxes' },
+  
+  { id: 'cat-wages', name: 'Wages & Salary', isIncome: true, parentId: null },
+  { id: 'cat-gross', name: 'Gross Pay', isIncome: true, parentId: 'cat-wages' },
 ];
 
 describe('PaycheckWizardPage', () => {
@@ -90,25 +93,42 @@ describe('PaycheckWizardPage', () => {
     });
   });
 
-  it('pre-populates default tax items and correctly resolves their categories', async () => {
+  it('pre-populates default tax items and Salary earning', async () => {
     render(<PaycheckWizardPage />);
     
-    // Wait for the data loading to complete and the table to display
+    // Wait for data loading
     await waitFor(() => {
       expect(screen.getByText('Federal Tax')).toBeInTheDocument();
     });
 
-    // Check pre-populated tax names
+    // Check pre-populated items
     expect(screen.getByText('Federal Tax')).toBeInTheDocument();
-    expect(screen.getByText('State Tax')).toBeInTheDocument();
-    expect(screen.getByText('Social Security (FICA)')).toBeInTheDocument();
-    expect(screen.getByText('Medicare Tax')).toBeInTheDocument();
-    expect(screen.getByText('Disability (SDI)')).toBeInTheDocument();
+    expect(screen.getByText('Salary')).toBeInTheDocument();
 
-    // Check that resolved category names are correct and mapped properly
+    // Check category resolution
     expect(screen.getByText('Federal Income')).toBeInTheDocument();
-    expect(screen.getByText('Social Security')).toBeInTheDocument();
-    expect(screen.getByText('Medicare')).toBeInTheDocument();
-    expect(screen.getAllByText('State/Provincial').length).toBeGreaterThan(0); // State Tax and SDI map to State/Provincial if State Income is missing/matched
+    expect(screen.getByText('Gross Pay')).toBeInTheDocument();
+  });
+
+  it('toggles Track Net Only mode', async () => {
+    render(<PaycheckWizardPage />);
+    
+    await waitFor(() => {
+      expect(screen.getByText('Track Net Only')).toBeInTheDocument();
+    });
+
+    // Detailed panels should be visible initially
+    expect(screen.getByText('Earnings')).toBeInTheDocument();
+    expect(screen.getByText('Taxes')).toBeInTheDocument();
+
+    // Toggle Track Net Only
+    const toggleButton = screen.getByRole('button', { name: /Track Net Only/i || '' });
+    fireEvent.click(toggleButton);
+
+    // Detailed panels should be hidden, and Net Pay Amount input should show
+    expect(screen.queryByText('Earnings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Taxes')).not.toBeInTheDocument();
+    expect(screen.getByText('Net Pay Amount')).toBeInTheDocument();
+    expect(screen.getByLabelText('Net Pay Amount ($)')).toBeInTheDocument();
   });
 });

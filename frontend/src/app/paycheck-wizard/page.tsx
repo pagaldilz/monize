@@ -146,6 +146,30 @@ const findCategoryForTax = (templateName: string, categories: Category[]): Categ
   return categories.find(c => !c.isIncome);
 };
 
+const findCategoryForEarning = (categories: Category[]): Category | undefined => {
+  // 1. Look for a subcategory whose parent is "Wages & Salary" or "Wages" or "Salary" and name matches "Gross Pay" or "Salary"
+  const match = categories.find(c => {
+    if (c.parentId) {
+      const parent = categories.find(p => p.id === c.parentId);
+      if (parent && (parent.name.toLowerCase() === 'wages & salary' || parent.name.toLowerCase() === 'wages' || parent.name.toLowerCase() === 'salary')) {
+        return c.name.toLowerCase() === 'gross pay' || c.name.toLowerCase() === 'salary' || c.name.toLowerCase() === 'regular';
+      }
+    }
+    return false;
+  });
+  if (match) return match;
+
+  // 2. Look for any category named "Wages & Salary", "Salary", "Gross Pay", etc.
+  const simpleMatch = categories.find(c => {
+    const name = c.name.toLowerCase();
+    return name === 'gross pay' || name === 'salary' || name === 'wages & salary' || name === 'wages';
+  });
+  if (simpleMatch) return simpleMatch;
+
+  // Fallback to first income category
+  return categories.find(c => c.isIncome);
+};
+
 
 interface PaycheckItem {
   id: string;
@@ -200,6 +224,10 @@ function PaycheckWizardContent() {
   const [taxes, setTaxes] = useState<PaycheckItem[]>([]);
   const [afterTaxDeductions, setAfterTaxDeductions] = useState<PaycheckItem[]>([]);
   const [depositAccounts, setDepositAccounts] = useState<DepositSplit[]>([]);
+
+  // "Track Net Only" states
+  const [trackNetOnly, setTrackNetOnly] = useState(false);
+  const [netPayInput, setNetPayInput] = useState('');
 
   // Accordion state
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({
@@ -286,7 +314,7 @@ function PaycheckWizardContent() {
         setPrimaryAccountId(activeDepositAccs[0].id);
       }
 
-      // Pre-populate default taxes if we are on 'new'
+      // Pre-populate default taxes and earnings if we are on 'new'
       if (selectedTemplateId === 'new') {
         const defaultTaxesList = [
           'Federal Tax',
@@ -304,6 +332,16 @@ function PaycheckWizardContent() {
           };
         });
         setTaxes(defaultTaxesList);
+
+        const defaultEarningCat = findCategoryForEarning(cats);
+        setEarnings([
+          {
+            id: Math.random().toString(),
+            name: 'Salary',
+            categoryId: defaultEarningCat?.id,
+            amount: 0,
+          }
+        ]);
       }
     } catch (error) {
       toast.error('Failed to load payroll configuration dependencies.');
@@ -317,13 +355,11 @@ function PaycheckWizardContent() {
     loadData();
   }, [loadData]);
 
-  // Handle template selection
   const handleTemplateChange = (id: string) => {
     setSelectedTemplateId(id);
     if (id === 'new') {
       setCompanyName('');
       setMemo('Paycheck');
-      setEarnings([]);
       setPreTaxDeductions([]);
       
       const defaultTaxesList = [
@@ -343,8 +379,20 @@ function PaycheckWizardContent() {
       });
       setTaxes(defaultTaxesList);
 
+      const defaultEarningCat = findCategoryForEarning(categories);
+      setEarnings([
+        {
+          id: Math.random().toString(),
+          name: 'Salary',
+          categoryId: defaultEarningCat?.id,
+          amount: 0,
+        }
+      ]);
+
       setAfterTaxDeductions([]);
       setDepositAccounts([]);
+      setTrackNetOnly(false);
+      setNetPayInput('');
       if (accounts.length > 0) {
         setPrimaryAccountId(accounts[0].id);
       }
@@ -357,6 +405,19 @@ function PaycheckWizardContent() {
         setStartDate(template.startDate || template.nextDueDate);
         setFrequency(template.frequency);
         setPrimaryAccountId(template.accountId);
+        
+        const isNetOnly = (meta.preTaxDeductions || []).length === 0 &&
+                          (meta.taxes || []).length === 0 &&
+                          (meta.afterTaxDeductions || []).length === 0 &&
+                          (meta.earnings || []).length === 1 &&
+                          (meta.earnings || [])[0].name === 'Salary';
+        setTrackNetOnly(isNetOnly);
+        if (isNetOnly) {
+          setNetPayInput(((meta.earnings || [])[0].amount || 0).toString());
+        } else {
+          setNetPayInput('');
+        }
+
         setEarnings(meta.earnings || []);
         setPreTaxDeductions(meta.preTaxDeductions || []);
         setTaxes(meta.taxes || []);
@@ -368,6 +429,21 @@ function PaycheckWizardContent() {
 
   // Math Calculations
   const calculations = useMemo(() => {
+    if (trackNetOnly) {
+      const netPay = Number(netPayInput || 0);
+      const gross = netPay;
+      return {
+        gross,
+        preTaxTotal: 0,
+        taxesTotal: 0,
+        afterTaxTotal: 0,
+        netPay,
+        w2Gross: netPay,
+        secondaryDeposits: 0,
+        primaryDeposit: netPay,
+      };
+    }
+
     const gross = earnings.reduce((sum, e) => sum + e.amount, 0);
     const preTaxTotal = preTaxDeductions.reduce((sum, d) => sum + d.amount, 0);
     const taxesTotal = taxes.reduce((sum, t) => sum + t.amount, 0);
@@ -394,7 +470,7 @@ function PaycheckWizardContent() {
       secondaryDeposits,
       primaryDeposit,
     };
-  }, [earnings, preTaxDeductions, taxes, afterTaxDeductions, depositAccounts]);
+  }, [earnings, preTaxDeductions, taxes, afterTaxDeductions, depositAccounts, trackNetOnly, netPayInput]);
 
   // Open add/edit item modal
   const openItemModal = (
@@ -597,6 +673,22 @@ function PaycheckWizardContent() {
       return;
     }
 
+    const finalEarnings = trackNetOnly
+      ? [
+          {
+            id: Math.random().toString(),
+            name: 'Salary',
+            categoryId: findCategoryForEarning(categories)?.id,
+            amount: calculations.primaryDeposit,
+          }
+        ]
+      : earnings;
+
+    const finalPreTax = trackNetOnly ? [] : preTaxDeductions;
+    const finalTaxes = trackNetOnly ? [] : taxes;
+    const finalAfterTax = trackNetOnly ? [] : afterTaxDeductions;
+    const finalDepositAccounts = trackNetOnly ? [] : depositAccounts;
+
     const payload = {
       accountId: primaryAccountId,
       name: `Paycheck: ${companyName}`,
@@ -610,11 +702,11 @@ function PaycheckWizardContent() {
       autoPost: false,
       paycheckMetadata: {
         companyName,
-        earnings,
-        preTaxDeductions,
-        taxes,
-        afterTaxDeductions,
-        depositAccounts,
+        earnings: finalEarnings,
+        preTaxDeductions: finalPreTax,
+        taxes: finalTaxes,
+        afterTaxDeductions: finalAfterTax,
+        depositAccounts: finalDepositAccounts,
       },
     };
 
@@ -755,8 +847,64 @@ function PaycheckWizardContent() {
                 </div>
               </div>
 
-              {/* Earnings Panel */}
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
+              {/* Track Net Only Toggle Card */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h4 className="font-bold text-gray-900 dark:text-white">Track Net Only</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Simplify paycheck setup to a single net amount without entering taxes/deductions.
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    role="button"
+                    aria-label="Track Net Only"
+                    onClick={() => {
+                      const nextVal = !trackNetOnly;
+                      setTrackNetOnly(nextVal);
+                      if (nextVal && !netPayInput && calculations.netPay > 0) {
+                        setNetPayInput(calculations.netPay.toFixed(2));
+                      }
+                    }}
+                    className="relative inline-flex items-center cursor-pointer focus:outline-none"
+                  >
+                    <div className={`w-11 h-6 rounded-full transition-colors relative ${trackNetOnly ? 'bg-blue-600' : 'bg-gray-205 dark:bg-gray-700'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-[2px] transition-transform ${trackNetOnly ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {trackNetOnly ? (
+                /* Simple Net Pay Input Card */
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm space-y-4">
+                  <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Net Pay Information
+                  </h3>
+                  <div>
+                    <label htmlFor="netPayInput" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                      <span>Net Pay Amount</span> ($)
+                    </label>
+                    <input
+                      id="netPayInput"
+                      type="number"
+                      step="0.01"
+                      value={netPayInput}
+                      onChange={e => setNetPayInput(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-lg"
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Earnings Panel */}
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
                 <button
                   onClick={() => togglePanel('earnings')}
                   className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-850 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors focus:outline-none"
@@ -1001,6 +1149,8 @@ function PaycheckWizardContent() {
                   </div>
                 )}
               </div>
+                </>
+              )}
             </div>
 
             {/* Right column: live calculation values */}
@@ -1032,6 +1182,70 @@ function PaycheckWizardContent() {
                     <span>Total Net Pay</span>
                     <span className="text-blue-600 dark:text-blue-400">${calculations.netPay.toFixed(2)}</span>
                   </div>
+
+                  {/* Visual Stacked Progress Bar Breakdown */}
+                  {!trackNetOnly && calculations.gross > 0 && (
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700/50">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1.5 font-medium">
+                        <span>Paycheck Breakdown</span>
+                        <span>Gross: ${calculations.gross.toFixed(2)}</span>
+                      </div>
+                      <div className="w-full h-4 rounded-full overflow-hidden flex bg-gray-100 dark:bg-gray-700 shadow-inner">
+                        {calculations.netPay > 0 && (
+                          <div
+                            style={{ width: `${(calculations.netPay / calculations.gross) * 100}%` }}
+                            className="bg-blue-500 h-full transition-all duration-300 hover:opacity-90 cursor-help"
+                            title={`Net Pay: $${calculations.netPay.toFixed(2)} (${((calculations.netPay / calculations.gross) * 100).toFixed(0)}%)`}
+                          />
+                        )}
+                        {calculations.taxesTotal > 0 && (
+                          <div
+                            style={{ width: `${(calculations.taxesTotal / calculations.gross) * 100}%` }}
+                            className="bg-red-500 h-full transition-all duration-300 hover:opacity-90 cursor-help"
+                            title={`Taxes: $${calculations.taxesTotal.toFixed(2)} (${((calculations.taxesTotal / calculations.gross) * 100).toFixed(0)}%)`}
+                          />
+                        )}
+                        {calculations.preTaxTotal > 0 && (
+                          <div
+                            style={{ width: `${(calculations.preTaxTotal / calculations.gross) * 100}%` }}
+                            className="bg-amber-500 h-full transition-all duration-300 hover:opacity-90 cursor-help"
+                            title={`Pre-Tax Deductions: $${calculations.preTaxTotal.toFixed(2)} (${((calculations.preTaxTotal / calculations.gross) * 100).toFixed(0)}%)`}
+                          />
+                        )}
+                        {calculations.afterTaxTotal > 0 && (
+                          <div
+                            style={{ width: `${(calculations.afterTaxTotal / calculations.gross) * 100}%` }}
+                            className="bg-orange-600 h-full transition-all duration-300 hover:opacity-90 cursor-help"
+                            title={`After-Tax Deductions: $${calculations.afterTaxTotal.toFixed(2)} (${((calculations.afterTaxTotal / calculations.gross) * 100).toFixed(0)}%)`}
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-x-4 gap-y-1 mt-2.5 flex-wrap text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
+                        <div className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                          <span>Net Pay ({((calculations.netPay / calculations.gross) * 100).toFixed(0)}%)</span>
+                        </div>
+                        {calculations.taxesTotal > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                            <span>Taxes ({((calculations.taxesTotal / calculations.gross) * 100).toFixed(0)}%)</span>
+                          </div>
+                        )}
+                        {calculations.preTaxTotal > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span>Pre-Tax ({((calculations.preTaxTotal / calculations.gross) * 100).toFixed(0)}%)</span>
+                          </div>
+                        )}
+                        {calculations.afterTaxTotal > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-orange-600"></span>
+                            <span>Post-Tax ({((calculations.afterTaxTotal / calculations.gross) * 100).toFixed(0)}%)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t border-gray-200 dark:border-gray-750 pt-4 space-y-2">
                     <h4 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Split Deposits Distribution</h4>
