@@ -922,19 +922,38 @@ function PaycheckWizardContent() {
                     <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2 w-[35%]">Name</th>
-                          <th className="pb-2 w-[35%]">Category</th>
-                          <th className="pb-2 w-[15%] text-right">Amount</th>
-                          <th className="pb-2 w-[15%] text-right">Actions</th>
+                          <th className="pb-2 w-[30%]">Name</th>
+                          <th className="pb-2 w-[30%]">Category</th>
+                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {earnings.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-green-600 dark:text-green-400 w-[15%] pr-4">+${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2 w-[15%]">
+                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-1 text-right font-bold text-green-600 dark:text-green-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-end">
+                                <span className="mr-0.5 font-bold text-green-600 dark:text-green-400">+$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.amount === 0 ? '' : item.amount}
+                                  placeholder="0.00"
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setEarnings(prev => {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], amount: val };
+                                      return updated;
+                                    });
+                                  }}
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-green-600 dark:text-green-400"
+                                />
+                              </div>
+                            </td>
+                            <td className="py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('earning', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('earning', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -971,19 +990,38 @@ function PaycheckWizardContent() {
                     <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2 w-[35%]">Name</th>
-                          <th className="pb-2 w-[35%]">Category / Account</th>
-                          <th className="pb-2 w-[15%] text-right">Amount</th>
-                          <th className="pb-2 w-[15%] text-right">Actions</th>
+                          <th className="pb-2 w-[30%]">Name</th>
+                          <th className="pb-2 w-[30%]">Category / Account</th>
+                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {preTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2 w-[15%]">
+                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-end">
+                                <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.amount === 0 ? '' : item.amount}
+                                  placeholder="0.00"
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setPreTaxDeductions(prev => {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], amount: val };
+                                      return updated;
+                                    });
+                                  }}
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                />
+                              </div>
+                            </td>
+                            <td className="py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('preTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('preTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1020,19 +1058,38 @@ function PaycheckWizardContent() {
                     <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2 w-[35%]">Name</th>
-                          <th className="pb-2 w-[35%]">Category</th>
-                          <th className="pb-2 w-[15%] text-right">Amount</th>
-                          <th className="pb-2 w-[15%] text-right">Actions</th>
+                          <th className="pb-2 w-[30%]">Name</th>
+                          <th className="pb-2 w-[30%]">Category</th>
+                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {taxes.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2 w-[15%]">
+                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-end">
+                                <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.amount === 0 ? '' : item.amount}
+                                  placeholder="0.00"
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setTaxes(prev => {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], amount: val };
+                                      return updated;
+                                    });
+                                  }}
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                />
+                              </div>
+                            </td>
+                            <td className="py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('tax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('tax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1069,19 +1126,38 @@ function PaycheckWizardContent() {
                     <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2 w-[35%]">Name</th>
-                          <th className="pb-2 w-[35%]">Category / Account</th>
-                          <th className="pb-2 w-[15%] text-right">Amount</th>
-                          <th className="pb-2 w-[15%] text-right">Actions</th>
+                          <th className="pb-2 w-[30%]">Name</th>
+                          <th className="pb-2 w-[30%]">Category / Account</th>
+                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {afterTaxDeductions.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{item.name}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="py-2.5 text-right font-bold text-red-600 dark:text-red-400 w-[15%] pr-4">-${item.amount.toFixed(2)}</td>
-                            <td className="py-2.5 text-right space-x-2 w-[15%]">
+                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
+                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
+                            <td className="py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-end">
+                                <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.amount === 0 ? '' : item.amount}
+                                  placeholder="0.00"
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setAfterTaxDeductions(prev => {
+                                      const updated = [...prev];
+                                      updated[idx] = { ...updated[idx], amount: val };
+                                      return updated;
+                                    });
+                                  }}
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                />
+                              </div>
+                            </td>
+                            <td className="py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('afterTax', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('afterTax', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
@@ -1118,21 +1194,61 @@ function PaycheckWizardContent() {
                     <table className="w-full text-left text-sm table-fixed">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
-                          <th className="pb-2 w-[35%]">Account</th>
-                          <th className="pb-2 w-[35%]">Memo</th>
-                          <th className="pb-2 w-[15%] text-right">Split Metric</th>
-                          <th className="pb-2 w-[15%] text-right">Actions</th>
+                          <th className="pb-2 w-[30%]">Account</th>
+                          <th className="pb-2 w-[30%]">Memo</th>
+                          <th className="pb-2 w-[22%] text-right">Split Metric</th>
+                          <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {depositAccounts.map((item, idx) => (
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                            <td className="py-2.5 font-medium w-[35%] pr-4 truncate">{getAccountName(item.accountId)}</td>
-                            <td className="py-2.5 text-gray-700 dark:text-gray-300 w-[35%] pr-4 truncate">{item.memo}</td>
-                            <td className="py-2.5 text-right font-bold w-[15%] pr-4">
-                              {item.amount !== undefined ? `$${item.amount.toFixed(2)}` : `${item.percent}%`}
+                            <td className="py-2 w-[30%] pr-4 truncate font-medium">{getAccountName(item.accountId)}</td>
+                            <td className="py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{item.memo}</td>
+                            <td className="py-1 text-right font-bold w-[22%] pr-4">
+                              <div className="flex items-center justify-end">
+                                {item.amount !== undefined ? (
+                                  <>
+                                    <span className="mr-0.5 text-gray-700 dark:text-gray-300">$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={item.amount === 0 ? '' : item.amount}
+                                      placeholder="0.00"
+                                      onChange={e => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        setDepositAccounts(prev => {
+                                          const updated = [...prev];
+                                          updated[idx] = { ...updated[idx], amount: val };
+                                          return updated;
+                                        });
+                                      }}
+                                      className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      value={item.percent === 0 ? '' : item.percent}
+                                      placeholder="0"
+                                      onChange={e => {
+                                        const val = parseInt(e.target.value) || 0;
+                                        setDepositAccounts(prev => {
+                                          const updated = [...prev];
+                                          updated[idx] = { ...updated[idx], percent: val };
+                                          return updated;
+                                        });
+                                      }}
+                                      className="w-16 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                    />
+                                    <span className="ml-0.5 text-gray-700 dark:text-gray-300">%</span>
+                                  </>
+                                )}
+                              </div>
                             </td>
-                            <td className="py-2.5 text-right space-x-2 w-[15%]">
+                            <td className="py-2 text-right space-x-2 w-[18%]">
                               <button onClick={() => openItemModal('deposit', idx)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
                               <button onClick={() => handleDeleteItem('deposit', idx)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Delete</button>
                             </td>
