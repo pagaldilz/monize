@@ -3,6 +3,10 @@
 </p>
 
 # Monize
+
+> [!NOTE]
+> This is a personal project and custom branch of Monize. I am just another vibe-coder building upon the original project, using AI to customize it to my specific workflow and Quicken replacement needs.
+
 > [!CAUTION] 
 > This project is 100% written by AI. I've done practically zero manual changes. I am not a programmer by trade, but have dabbled in various languages over the years. This gives me high-level awareness on coding practices, but **I AM NOT SKILLED IN THE LANGUAGES USED IN THIS PRODUCT**. I have spent months prompting Claude Code for features, updates, fixes and tweaks. I have taken steps to ensure this is secure as it can be, given the constraints. I've performed numerous security audits (both AI-prompted and 3rd party) and have implemented best-practice security measures as much as I can (including 2FA and OIDC support). Every build must pass NPM audits and security scans before publishing. However, I can't personally guarantee the security of this code. **YOU HAVE BEEN WARNED**. 
 
@@ -56,7 +60,10 @@ My perfect product to replace MS Money needed the following features:
 - Must support PostgreSQL for the backend tables
 - Must have a usable mobile app or web interface
 
-Since I couldn't find anything out there to meet that criteria, I decided to create Monize! After weeks of vibe-coding and testing, I finally was able to migrate ALL of 30+ years of Microsoft Money data into Monize with no errors or discrepancies. Microsoft Money has finally been retired!
+Since I couldn't find anything out there to meet that criteria, I decided to create Monize! After weeks of vibe-coding and testing, I finally was able to migrate ALL of my 30+ years of financial data into Monize with no errors or discrepancies. Microsoft Money has finally been retired!
+
+> [!NOTE]
+> Monize is designed specifically as my personal replacement for Microsoft Money and Quicken, custom-tailored to how *I* use it and manage my finances. While it works perfectly for my workflow, others may use it differently or have different requirements for their personal finance setup.
 
 Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 
@@ -73,14 +80,17 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 
 ### Transaction Management
 - Full transaction tracking with categories and payees
+- Separate notes column next to Description/Memo for detailed annotations
 - Split transaction support for complex transactions
 - Transaction tags for flexible cross-category labelling
 - Transaction reconciliation and clearing
 - Bulk update and bulk delete operations with filter-based selection
-- Payees with auto-categorization rules, aliases with wildcard patterns, and merge capability
+- Payees with default category backfilling, interactive auto-categorization suggestions (with uncategorized count indicators), aliases with wildcard patterns, and merge capability
 - Multi-currency transactions with automatic exchange rate tracking
 - Import from CSV, OFX/QFX, and QIF (Quicken and Microsoft Money) with smart column auto-matching
+- AI Smart Import: parse raw, copy-pasted, or unstructured transaction text with custom instructions, automatic account/field mapping, and real-time SSE streaming progress
 - Quicken full-file import: import all accounts, categories, and tags from a single QIF export
+- Balance History Chart: interactive visualization with customizable timeframes and high-performance Fast Render toggle for large datasets
 - Data reset: wipe financial data and re-import without losing your user account or settings
 
 ### Investment Features
@@ -92,6 +102,7 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Investment transactions: buy, sell, dividend, interest, splits, transfers
 - Portfolio tracking with real-time valuations
 - Historical price backfill
+- Sortable transaction columns for brokerage and cash activities
 
 ### Multi-Currency Support
 - Support for multiple currencies (USD, CAD, EUR, GBP, JPY, CHF, AUD, CNY and others for starters)
@@ -137,8 +148,9 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 
 ### AI Financial Assistant
 - **Natural language queries** about your finances ("How much did I spend on dining last month?", "What are my top expense categories?")
-- **Multi-provider support**: Anthropic (Claude), OpenAI (GPT), Ollama (local models), and any OpenAI-compatible endpoint
-- **Real-time streaming** responses via Server-Sent Events
+- **AI Smart Import**: Parse raw, unstructured clipboard text, messages, or emails into formatted transactions with custom instructions, account coercion, and real-time streaming
+- **Multi-provider support**: Anthropic (Claude), OpenAI (GPT), Ollama (local models), and local OpenAI-compatible providers (like LMStudio) with optimized API integration
+- **Real-time streaming** responses via Server-Sent Events for assistant queries and smart data imports
 - **6 financial analysis tools**: transaction search/aggregation, account balances, spending by category, income summary, net worth history, and period comparison
 - **Per-user provider configuration** with encrypted API key storage (AES-256-GCM)
 - **Usage tracking** with per-request token and cost analytics
