@@ -949,7 +949,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-green-600 dark:text-green-400"
+                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-green-600 dark:text-green-400"
                                 />
                               </div>
                             </td>
@@ -1017,7 +1017,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1085,7 +1085,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1153,7 +1153,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1223,7 +1223,7 @@ function PaycheckWizardContent() {
                                           return updated;
                                         });
                                       }}
-                                      className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                      className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
                                     />
                                   </>
                                 ) : (
@@ -1241,7 +1241,7 @@ function PaycheckWizardContent() {
                                           return updated;
                                         });
                                       }}
-                                      className="w-16 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                      className="w-16 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
                                     />
                                     <span className="ml-0.5 text-gray-700 dark:text-gray-300">%</span>
                                   </>
