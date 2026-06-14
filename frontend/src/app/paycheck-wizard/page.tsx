@@ -924,7 +924,7 @@ function PaycheckWizardContent() {
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
                           <th className="pb-2 w-[30%]">Name</th>
                           <th className="pb-2 w-[30%]">Category</th>
-                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[22%] text-center">Amount</th>
                           <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
@@ -933,8 +933,8 @@ function PaycheckWizardContent() {
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
                             <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
                             <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="align-middle py-1 text-right font-bold text-green-600 dark:text-green-400 w-[22%] pr-4">
-                              <div className="flex items-center justify-end">
+                            <td className="align-middle py-1 text-center font-bold text-green-600 dark:text-green-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-center">
                                 <span className="mr-0.5 font-bold text-green-600 dark:text-green-400">+$</span>
                                 <input
                                   type="number"
@@ -949,7 +949,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-green-600 dark:text-green-400"
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-green-600 dark:text-green-400"
                                 />
                               </div>
                             </td>
@@ -992,7 +992,7 @@ function PaycheckWizardContent() {
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
                           <th className="pb-2 w-[30%]">Name</th>
                           <th className="pb-2 w-[30%]">Category / Account</th>
-                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[22%] text-center">Amount</th>
                           <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1001,8 +1001,8 @@ function PaycheckWizardContent() {
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
                             <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
                             <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
-                              <div className="flex items-center justify-end">
+                            <td className="align-middle py-1 text-center font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-center">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
                                   type="number"
@@ -1017,7 +1017,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1060,7 +1060,7 @@ function PaycheckWizardContent() {
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
                           <th className="pb-2 w-[30%]">Name</th>
                           <th className="pb-2 w-[30%]">Category</th>
-                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[22%] text-center">Amount</th>
                           <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1069,8 +1069,8 @@ function PaycheckWizardContent() {
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
                             <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
                             <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
-                              <div className="flex items-center justify-end">
+                            <td className="align-middle py-1 text-center font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-center">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
                                   type="number"
@@ -1085,7 +1085,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1128,7 +1128,7 @@ function PaycheckWizardContent() {
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
                           <th className="pb-2 w-[30%]">Name</th>
                           <th className="pb-2 w-[30%]">Category / Account</th>
-                          <th className="pb-2 w-[22%] text-right">Amount</th>
+                          <th className="pb-2 w-[22%] text-center">Amount</th>
                           <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1137,8 +1137,8 @@ function PaycheckWizardContent() {
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
                             <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{item.name}</td>
                             <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{getCategoryName(item)}</td>
-                            <td className="align-middle py-1 text-right font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
-                              <div className="flex items-center justify-end">
+                            <td className="align-middle py-1 text-center font-bold text-red-600 dark:text-red-400 w-[22%] pr-4">
+                              <div className="flex items-center justify-center">
                                 <span className="mr-0.5 font-bold text-red-600 dark:text-red-400">-$</span>
                                 <input
                                   type="number"
@@ -1153,7 +1153,7 @@ function PaycheckWizardContent() {
                                       return updated;
                                     });
                                   }}
-                                  className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
+                                  className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-red-600 dark:text-red-400"
                                 />
                               </div>
                             </td>
@@ -1196,7 +1196,7 @@ function PaycheckWizardContent() {
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase font-bold">
                           <th className="pb-2 w-[30%]">Account</th>
                           <th className="pb-2 w-[30%]">Memo</th>
-                          <th className="pb-2 w-[22%] text-right">Split Metric</th>
+                          <th className="pb-2 w-[22%] text-center">Split Metric</th>
                           <th className="pb-2 w-[18%] text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1205,8 +1205,8 @@ function PaycheckWizardContent() {
                           <tr key={item.id} className="border-b border-gray-200 dark:border-gray-750/50 hover:bg-gray-50 dark:hover:bg-gray-750/30">
                             <td className="align-middle py-2 w-[30%] pr-4 truncate font-medium">{getAccountName(item.accountId)}</td>
                             <td className="align-middle py-2 text-gray-700 dark:text-gray-300 w-[30%] pr-4 truncate">{item.memo}</td>
-                            <td className="align-middle py-1 text-right font-bold w-[22%] pr-4">
-                              <div className="flex items-center justify-end">
+                            <td className="align-middle py-1 text-center font-bold w-[22%] pr-4">
+                              <div className="flex items-center justify-center">
                                 {item.amount !== undefined ? (
                                   <>
                                     <span className="mr-0.5 text-gray-700 dark:text-gray-300">$</span>
@@ -1223,7 +1223,7 @@ function PaycheckWizardContent() {
                                           return updated;
                                         });
                                       }}
-                                      className="w-24 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                      className="w-24 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
                                     />
                                   </>
                                 ) : (
@@ -1241,7 +1241,7 @@ function PaycheckWizardContent() {
                                           return updated;
                                         });
                                       }}
-                                      className="w-16 text-center bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
+                                      className="w-16 text-right bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-700 px-1.5 py-0.5 rounded focus:outline-none font-bold text-gray-700 dark:text-gray-300"
                                     />
                                     <span className="ml-0.5 text-gray-700 dark:text-gray-300">%</span>
                                   </>
