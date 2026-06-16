@@ -25,6 +25,18 @@ import {
   backfillPayeeCategory,
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
+import { stripHtml } from "../common/sanitization.util";
+
+/**
+ * Resolved, sanitized preview of a proposed new payee. Shared by the AI
+ * Assistant human-in-the-loop confirmation flow so the preview matches what
+ * `create()` would persist.
+ */
+export interface CreatePayeePreview {
+  name: string;
+  defaultCategoryId: string | null;
+  defaultCategoryName: string | null;
+}
 
 function escapeLikeWildcards(value: string): string {
   // Escape backslash first, then the LIKE wildcards. Escaping only the
@@ -93,6 +105,47 @@ export class PayeesService {
       descriptionParams: { name: saved.name },
     });
     return saved;
+  }
+
+  /**
+   * Validate and resolve a proposed new payee WITHOUT persisting it. Sanitizes
+   * the name, rejects duplicates, and resolves the optional default category to
+   * a display name. Used by the AI Assistant confirmation flow.
+   */
+  async previewCreate(
+    userId: string,
+    input: { name: string; defaultCategoryId?: string | null },
+  ): Promise<CreatePayeePreview> {
+    const name = stripHtml(input.name)?.trim() || "";
+
+    const existing = await this.payeesRepository.findOne({
+      where: { userId, name },
+    });
+    if (existing) {
+      throw new ConflictException(
+        tr(
+          "errors.payees.nameConflict",
+          `Payee with name "${name}" already exists`,
+          { name },
+        ),
+      );
+    }
+
+    let defaultCategoryName: string | null = null;
+    const defaultCategoryId = input.defaultCategoryId ?? null;
+    if (defaultCategoryId) {
+      const cat = await this.categoriesRepository.findOne({
+        where: { id: defaultCategoryId, userId },
+      });
+      if (!cat) {
+        throw new NotFoundException(
+          tr("errors.transactions.categoryNotFound", "Category not found"),
+        );
+      }
+      defaultCategoryName = cat.name;
+    }
+
+    return { name, defaultCategoryId, defaultCategoryName };
   }
 
   async findAll(

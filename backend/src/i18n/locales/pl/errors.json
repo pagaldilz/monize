@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "Wystąpił nieoczekiwany błąd podczas przetwarzania zapytania.",
+    "actionSignatureInvalid": "Nie udało się zweryfikować tej akcji.",
+    "actionExpired": "To potwierdzenie wygasło. Zapytaj ponownie.",
+    "actionWriteLimit": "Osiągnięto dzienny limit zapisu AI ({{ limit }} na dzień). Spróbuj ponownie jutro.",
+    "actionConfirmFailed": "Nie udało się potwierdzić tej akcji.",
     "providerConfigNotFound": "Nie znaleziono konfiguracji dostawcy AI",
     "maxProvidersExceeded": "Maksymalnie {{ maxProvidersPerUser }} konfiguracji dostawców AI na użytkownika",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY nie jest skonfigurowany. Nie można bezpiecznie przechowywać kluczy API.",

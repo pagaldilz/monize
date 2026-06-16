@@ -181,6 +181,51 @@ export const renderChartSchema = z.object({
     .max(20),
 });
 
+/**
+ * Money amount matching CreateTransactionDto: bounded and at most 4 decimal
+ * places. The decimal-place check mirrors `@IsNumber({ maxDecimalPlaces: 4 })`
+ * so the model cannot smuggle a higher-precision value past the tool schema.
+ */
+const amountSchema = z
+  .number()
+  .finite()
+  .min(-999999999999)
+  .max(999999999999)
+  .refine(
+    (n) => Math.abs(n * 10000 - Math.round(n * 10000)) < 1e-6,
+    "amount supports at most 4 decimal places",
+  );
+
+export const searchTransactionsSchema = z.object({
+  searchText: z.string().max(200).optional(),
+  startDate: isoDateSchema.optional(),
+  endDate: isoDateSchema.optional(),
+  accountName: z.string().max(100).optional(),
+  categoryName: z.string().max(100).optional(),
+  minAmount: z.number().min(-999999999999).max(999999999999).optional(),
+  maxAmount: z.number().min(-999999999999).max(999999999999).optional(),
+  limit: positiveIntSchema(1, 25).optional(),
+});
+
+export const createTransactionSchema = z.object({
+  accountName: z.string().min(1).max(100),
+  amount: amountSchema,
+  date: isoDateSchema,
+  payeeName: z.string().max(100).optional(),
+  categoryName: z.string().max(100).optional(),
+  description: z.string().max(500).optional(),
+});
+
+export const categorizeTransactionSchema = z.object({
+  transactionId: z.string().uuid(),
+  categoryName: z.string().min(1).max(100),
+});
+
+export const createPayeeSchema = z.object({
+  name: z.string().min(1).max(100),
+  defaultCategoryName: z.string().max(100).optional(),
+});
+
 export const toolInputSchemas: Record<string, z.ZodSchema> = {
   query_transactions: queryTransactionsSchema,
   get_account_balances: getAccountBalancesSchema,
@@ -198,6 +243,10 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   get_scheduled_transactions: getScheduledTransactionsSchema,
   calculate: calculateSchema,
   render_chart: renderChartSchema,
+  search_transactions: searchTransactionsSchema,
+  create_transaction: createTransactionSchema,
+  categorize_transaction: categorizeTransactionSchema,
+  create_payee: createPayeeSchema,
 };
 
 /**

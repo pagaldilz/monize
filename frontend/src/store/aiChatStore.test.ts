@@ -8,12 +8,15 @@ import type { StreamCallbacks } from '@/types/ai';
 let capturedCallbacks: StreamCallbacks | null = null;
 const mockAbortController = { abort: vi.fn() };
 
+const mockConfirmAction = vi.fn();
+
 vi.mock('@/lib/ai', () => ({
   aiApi: {
     queryStream: vi.fn((_query: string, callbacks: StreamCallbacks) => {
       capturedCallbacks = callbacks;
       return mockAbortController;
     }),
+    confirmAction: (...args: unknown[]) => mockConfirmAction(...args),
   },
 }));
 
@@ -488,6 +491,115 @@ describe('aiChatStore', () => {
       const state = useAiChatStore.getState();
       const assistant = state.messages.find((m) => m.role === 'assistant');
       expect(assistant?.error).toBe('Failed to connect to the AI service.');
+    });
+  });
+
+  describe('pending actions', () => {
+    const action = {
+      actionId: 'a1',
+      type: 'create_transaction' as const,
+      expiresAt: Date.now() + 60_000,
+      signature: 'sig',
+      descriptor: { type: 'create_transaction' },
+      preview: { accountName: 'Checking', amount: -12.5 },
+    };
+
+    function streamWithPendingAction() {
+      useAiChatStore.getState().submit('add a transaction');
+      capturedCallbacks?.onEvent({ type: 'pending_action', action });
+      capturedCallbacks?.onEvent({ type: 'content', text: 'Review the card.' });
+      capturedCallbacks?.onEvent({
+        type: 'done',
+        usage: { inputTokens: 1, outputTokens: 1, toolCalls: 1 },
+      });
+      const assistant = useAiChatStore
+        .getState()
+        .messages.find((m) => m.role === 'assistant')!;
+      return assistant;
+    }
+
+    it('attaches a pending action card to the assistant message', () => {
+      const assistant = streamWithPendingAction();
+      expect(assistant.pendingActions).toHaveLength(1);
+      expect(assistant.pendingActions![0]).toMatchObject({
+        actionId: 'a1',
+        status: 'pending',
+      });
+    });
+
+    it('confirmAction posts the descriptor and marks the card confirmed', async () => {
+      mockConfirmAction.mockResolvedValueOnce({
+        type: 'create_transaction',
+        id: 'tx-1',
+      });
+      const assistant = streamWithPendingAction();
+      await useAiChatStore.getState().confirmAction(assistant.id, 'a1');
+
+      expect(mockConfirmAction).toHaveBeenCalledWith({
+        actionId: 'a1',
+        signature: 'sig',
+        descriptor: { type: 'create_transaction' },
+      });
+      const updated = useAiChatStore
+        .getState()
+        .messages.find((m) => m.id === assistant.id)!;
+      expect(updated.pendingActions![0]).toMatchObject({
+        status: 'confirmed',
+        resultId: 'tx-1',
+      });
+    });
+
+    it('confirmAction records an error when the request fails', async () => {
+      mockConfirmAction.mockRejectedValueOnce({
+        response: { data: { message: 'Nope' } },
+      });
+      const assistant = streamWithPendingAction();
+      await useAiChatStore.getState().confirmAction(assistant.id, 'a1');
+
+      const updated = useAiChatStore
+        .getState()
+        .messages.find((m) => m.id === assistant.id)!;
+      expect(updated.pendingActions![0]).toMatchObject({
+        status: 'error',
+        errorMessage: 'Nope',
+      });
+    });
+
+    it('does not re-submit a non-pending action (double-submit guard)', async () => {
+      mockConfirmAction.mockResolvedValue({
+        type: 'create_transaction',
+        id: 'tx-1',
+      });
+      const assistant = streamWithPendingAction();
+      await useAiChatStore.getState().confirmAction(assistant.id, 'a1');
+      await useAiChatStore.getState().confirmAction(assistant.id, 'a1');
+      expect(mockConfirmAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancelAction marks the card cancelled without a request', () => {
+      const assistant = streamWithPendingAction();
+      useAiChatStore.getState().cancelAction(assistant.id, 'a1');
+      const updated = useAiChatStore
+        .getState()
+        .messages.find((m) => m.id === assistant.id)!;
+      expect(updated.pendingActions![0].status).toBe('cancelled');
+      expect(mockConfirmAction).not.toHaveBeenCalled();
+    });
+
+    it('_heal expires pending actions restored from storage', () => {
+      useAiChatStore.setState({
+        messages: [
+          {
+            id: 'm1',
+            role: 'assistant',
+            content: 'x',
+            pendingActions: [{ ...action, status: 'pending' }],
+          },
+        ],
+      });
+      useAiChatStore.getState()._heal();
+      const updated = useAiChatStore.getState().messages[0];
+      expect(updated.pendingActions![0].status).toBe('expired');
     });
   });
 });

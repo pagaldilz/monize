@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "Bei der Verarbeitung Ihrer Anfrage ist ein unerwarteter Fehler aufgetreten.",
+    "actionSignatureInvalid": "Diese Aktion konnte nicht verifiziert werden.",
+    "actionExpired": "Diese Bestätigung ist abgelaufen. Bitte fragen Sie erneut.",
+    "actionWriteLimit": "Tägliches KI-Schreiblimit erreicht ({{ limit }} pro Tag). Bitte versuchen Sie es morgen erneut.",
+    "actionConfirmFailed": "Diese Aktion konnte nicht bestätigt werden.",
     "providerConfigNotFound": "KI-Anbieterkonfiguration nicht gefunden",
     "maxProvidersExceeded": "Maximal {{ maxProvidersPerUser }} KI-Anbieterkonfigurationen pro Benutzer",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY ist nicht konfiguriert. API-Schlüssel können nicht sicher gespeichert werden.",

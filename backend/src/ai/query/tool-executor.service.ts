@@ -1,5 +1,22 @@
-import { Injectable, Inject, forwardRef, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  Logger,
+  HttpException,
+} from "@nestjs/common";
+import { randomUUID } from "crypto";
 import { AccountsService } from "../../accounts/accounts.service";
+import { TransactionsService } from "../../transactions/transactions.service";
+import { PayeesService } from "../../payees/payees.service";
+import { AiActionSigningService } from "../actions/ai-action-signing.service";
+import { AI_ACTION_TTL_MS } from "../actions/ai-action-signing.service";
+import {
+  CategorizeTransactionDescriptor,
+  CreatePayeeDescriptor,
+  CreateTransactionDescriptor,
+  PendingAiAction,
+} from "../actions/ai-action.types";
 import { AccountType } from "../../accounts/entities/account.entity";
 import { CategoriesService } from "../../categories/categories.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
@@ -30,7 +47,22 @@ interface ToolResult {
   summary: string;
   sources: Array<{ type: string; description: string; dateRange?: string }>;
   isError?: boolean;
+  // Sideband for human-in-the-loop write tools: the signed action descriptor +
+  // preview the query service emits as a `pending_action` SSE event. Never fed
+  // back to the model -- `data` carries the LLM-safe status instead.
+  pendingAction?: PendingAiAction;
 }
+
+/**
+ * LLM-facing status returned by every write tool. It deliberately contains no
+ * signature and tells the model the action is awaiting user approval so it does
+ * not retry or claim success.
+ */
+const PENDING_ACTION_TOOL_RESULT = {
+  status: "preview_shown",
+  message:
+    "A confirmation card has been shown to the user. The action has NOT been performed. Do not call this tool again or claim it was done; briefly ask the user to review and approve the card.",
+};
 
 @Injectable()
 export class ToolExecutorService {
@@ -51,6 +83,11 @@ export class ToolExecutorService {
     private readonly investmentTransactionsService: InvestmentTransactionsService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private readonly scheduledTransactionsService: ScheduledTransactionsService,
+    @Inject(forwardRef(() => TransactionsService))
+    private readonly transactionsService: TransactionsService,
+    @Inject(forwardRef(() => PayeesService))
+    private readonly payeesService: PayeesService,
+    private readonly signingService: AiActionSigningService,
   ) {}
 
   async execute(
@@ -132,6 +169,21 @@ export class ToolExecutorService {
         case "render_chart":
           result = this.renderChart(validatedInput);
           break;
+        case "search_transactions":
+          result = await this.searchTransactions(userId, validatedInput);
+          break;
+        case "create_transaction":
+          result = await this.createTransactionAction(userId, validatedInput);
+          break;
+        case "categorize_transaction":
+          result = await this.categorizeTransactionAction(
+            userId,
+            validatedInput,
+          );
+          break;
+        case "create_payee":
+          result = await this.createPayeeAction(userId, validatedInput);
+          break;
         default:
           this.logger.warn(`execute unknown tool=${toolName} user=${userId}`);
           return {
@@ -171,6 +223,338 @@ export class ToolExecutorService {
     return accountNames
       .map((name) => nameMap.get(name.toLowerCase()))
       .filter((id): id is string => id !== undefined);
+  }
+
+  /**
+   * Resolve a single account name to its id + currency. Returns undefined when
+   * the name does not match any of the user's accounts.
+   */
+  private async resolveAccountByName(
+    userId: string,
+    accountName: string,
+  ): Promise<{ id: string; name: string; currencyCode: string } | undefined> {
+    const accounts = await this.accountsService.findAll(userId, false);
+    const match = accounts.find(
+      (a) => a.name.toLowerCase() === accountName.toLowerCase(),
+    );
+    return match
+      ? { id: match.id, name: match.name, currencyCode: match.currencyCode }
+      : undefined;
+  }
+
+  /**
+   * Resolve a single category name to its id, failing loudly (returns null)
+   * when it cannot be resolved so the caller surfaces a clear error rather than
+   * silently dropping it.
+   */
+  private async resolveSingleCategoryId(
+    userId: string,
+    categoryName: string,
+  ): Promise<string | null> {
+    const resolved = await this.analyticsService.resolveLlmCategoryIds(userId, [
+      categoryName,
+    ]);
+    return resolved.categoryIds[0] ?? null;
+  }
+
+  private toolError(message: string): ToolResult {
+    return {
+      data: { error: message },
+      summary: message,
+      sources: [],
+      isError: true,
+    };
+  }
+
+  /**
+   * Map an exception from a write preview into a tool result. 4xx messages
+   * (e.g. duplicate payee, transaction not found) are passed through so the
+   * model can relay them; anything else becomes a generic error.
+   */
+  private toolErrorFromException(err: unknown, fallback: string): ToolResult {
+    if (err instanceof HttpException) {
+      const status = err.getStatus();
+      if (status >= 400 && status < 500) {
+        return this.toolError(err.message);
+      }
+    }
+    this.logger.warn(
+      `write preview failed: ${err instanceof Error ? err.message : err}`,
+    );
+    return this.toolError(fallback);
+  }
+
+  private async searchTransactions(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const searchText = input.searchText as string | undefined;
+    const startDate = input.startDate as string | undefined;
+    const endDate = input.endDate as string | undefined;
+    const accountName = input.accountName as string | undefined;
+    const categoryName = input.categoryName as string | undefined;
+    const minAmount = input.minAmount as number | undefined;
+    const maxAmount = input.maxAmount as number | undefined;
+    const limit = Math.min((input.limit as number | undefined) ?? 25, 25);
+
+    let accountId: string | undefined;
+    if (accountName) {
+      const account = await this.resolveAccountByName(userId, accountName);
+      if (!account) {
+        return this.toolError(
+          `Unknown account: ${accountName}. Use an exact name from the user's account list.`,
+        );
+      }
+      accountId = account.id;
+    }
+
+    let categoryId: string | undefined;
+    if (categoryName) {
+      const resolved = await this.resolveSingleCategoryId(userId, categoryName);
+      if (!resolved) {
+        return this.toolError(
+          `Unknown category: ${categoryName}. Call get_categories to look up valid names; subcategories can be referenced as "Parent: Child".`,
+        );
+      }
+      categoryId = resolved;
+    }
+
+    const data = await this.transactionsService.getLlmTransactionRows(userId, {
+      accountId,
+      categoryId,
+      startDate,
+      endDate,
+      query: searchText,
+      minAmount,
+      maxAmount,
+      limit,
+    });
+
+    return {
+      data,
+      summary: `Found ${data.transactions.length} transaction${
+        data.transactions.length === 1 ? "" : "s"
+      }${data.hasMore ? " (more available; narrow the search)" : ""}.`,
+      sources: [
+        {
+          type: "transactions",
+          description: "Transaction search results",
+        },
+      ],
+    };
+  }
+
+  private async createTransactionAction(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const accountName = input.accountName as string;
+    const amount = input.amount as number;
+    const date = input.date as string;
+    const payeeName = input.payeeName as string | undefined;
+    const categoryName = input.categoryName as string | undefined;
+    const description = input.description as string | undefined;
+
+    const account = await this.resolveAccountByName(userId, accountName);
+    if (!account) {
+      return this.toolError(
+        `Unknown account: ${accountName}. Use an exact name from the user's account list.`,
+      );
+    }
+
+    let categoryId: string | undefined;
+    if (categoryName) {
+      const resolved = await this.resolveSingleCategoryId(userId, categoryName);
+      if (!resolved) {
+        return this.toolError(
+          `Unknown category: ${categoryName}. Call get_categories to look up valid names; subcategories can be referenced as "Parent: Child".`,
+        );
+      }
+      categoryId = resolved;
+    }
+
+    let preview;
+    try {
+      preview = await this.transactionsService.previewCreate(userId, {
+        accountId: account.id,
+        amount,
+        transactionDate: date,
+        payeeName,
+        categoryId,
+        description,
+      });
+    } catch (err) {
+      return this.toolErrorFromException(
+        err,
+        "Could not prepare the transaction.",
+      );
+    }
+
+    const { actionId, expiresAt } = this.newActionEnvelope();
+    const descriptor: CreateTransactionDescriptor = {
+      type: "create_transaction",
+      userId,
+      actionId,
+      expiresAt,
+      accountId: preview.accountId,
+      amount: preview.amount,
+      transactionDate: preview.transactionDate,
+      payeeName: preview.payeeName,
+      categoryId: preview.categoryId,
+      description: preview.description,
+      currencyCode: preview.currencyCode,
+    };
+    const pendingAction: PendingAiAction = {
+      actionId,
+      type: "create_transaction",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        accountName: preview.accountName,
+        amount: preview.amount,
+        currencyCode: preview.currencyCode,
+        transactionDate: preview.transactionDate,
+        payeeName: preview.payeeName,
+        categoryName: preview.categoryName,
+        description: preview.description,
+      },
+    };
+
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared a transaction for ${preview.accountName} (${preview.amount} ${preview.currencyCode}) dated ${preview.transactionDate}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction,
+    };
+  }
+
+  private async categorizeTransactionAction(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const transactionId = input.transactionId as string;
+    const categoryName = input.categoryName as string;
+
+    const categoryId = await this.resolveSingleCategoryId(userId, categoryName);
+    if (!categoryId) {
+      return this.toolError(
+        `Unknown category: ${categoryName}. Call get_categories to look up valid names; subcategories can be referenced as "Parent: Child".`,
+      );
+    }
+
+    let preview;
+    try {
+      preview = await this.transactionsService.previewCategorize(
+        userId,
+        transactionId,
+        categoryId,
+      );
+    } catch (err) {
+      return this.toolErrorFromException(
+        err,
+        "Could not prepare the categorization.",
+      );
+    }
+
+    const { actionId, expiresAt } = this.newActionEnvelope();
+    const descriptor: CategorizeTransactionDescriptor = {
+      type: "categorize_transaction",
+      userId,
+      actionId,
+      expiresAt,
+      transactionId: preview.transactionId,
+      categoryId: preview.categoryId,
+    };
+    const pendingAction: PendingAiAction = {
+      actionId,
+      type: "categorize_transaction",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        payeeName: preview.payeeName,
+        amount: preview.amount,
+        transactionDate: preview.transactionDate,
+        accountName: preview.accountName,
+        currentCategoryName: preview.currentCategoryName,
+        newCategoryName: preview.newCategoryName,
+      },
+    };
+
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared to categorize the transaction as "${preview.newCategoryName}". Awaiting user confirmation.`,
+      sources: [],
+      pendingAction,
+    };
+  }
+
+  private async createPayeeAction(
+    userId: string,
+    input: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const name = input.name as string;
+    const defaultCategoryName = input.defaultCategoryName as string | undefined;
+
+    let defaultCategoryId: string | undefined;
+    if (defaultCategoryName) {
+      const resolved = await this.resolveSingleCategoryId(
+        userId,
+        defaultCategoryName,
+      );
+      if (!resolved) {
+        return this.toolError(
+          `Unknown category: ${defaultCategoryName}. Call get_categories to look up valid names.`,
+        );
+      }
+      defaultCategoryId = resolved;
+    }
+
+    let preview;
+    try {
+      preview = await this.payeesService.previewCreate(userId, {
+        name,
+        defaultCategoryId,
+      });
+    } catch (err) {
+      return this.toolErrorFromException(err, "Could not prepare the payee.");
+    }
+
+    const { actionId, expiresAt } = this.newActionEnvelope();
+    const descriptor: CreatePayeeDescriptor = {
+      type: "create_payee",
+      userId,
+      actionId,
+      expiresAt,
+      name: preview.name,
+      defaultCategoryId: preview.defaultCategoryId,
+    };
+    const pendingAction: PendingAiAction = {
+      actionId,
+      type: "create_payee",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        name: preview.name,
+        categoryName: preview.defaultCategoryName,
+      },
+    };
+
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared to create payee "${preview.name}". Awaiting user confirmation.`,
+      sources: [],
+      pendingAction,
+    };
+  }
+
+  private newActionEnvelope(): { actionId: string; expiresAt: number } {
+    return {
+      actionId: randomUUID(),
+      expiresAt: Date.now() + AI_ACTION_TTL_MS,
+    };
   }
 
   private async queryTransactions(

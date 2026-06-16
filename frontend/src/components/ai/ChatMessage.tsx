@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AssistantMarkdown } from './AssistantMarkdown';
 import { ResultChart } from './ResultChart';
+import { TransactionConfirmationCard } from './TransactionConfirmationCard';
+import { useAiChatStore } from '@/store/aiChatStore';
+import type { PendingAction } from '@/types/ai';
 
 interface ToolInfo {
   name: string;
@@ -25,11 +28,15 @@ interface ChartInfo {
 }
 
 interface ChatMessageProps {
+  // Message id, used to route confirm/cancel of pending action cards back to
+  // the store. Always supplied by ChatInterface; optional for simpler tests.
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   toolsUsed?: ToolInfo[];
   sources?: SourceInfo[];
   charts?: ChartInfo[];
+  pendingActions?: PendingAction[];
   isStreaming?: boolean;
   error?: string;
 }
@@ -44,6 +51,10 @@ const TOOL_LABELS: Record<string, string> = {
   get_budget_status: 'Budget Status',
   calculate: 'Calculation',
   render_chart: 'Chart',
+  search_transactions: 'Transaction Search',
+  create_transaction: 'Create Transaction',
+  categorize_transaction: 'Categorize Transaction',
+  create_payee: 'Create Payee',
 };
 
 function ToolDetails({ tool }: { tool: ToolInfo }) {
@@ -154,14 +165,19 @@ function ToolDetails({ tool }: { tool: ToolInfo }) {
 }
 
 export function ChatMessage({
+  id,
   role,
   content,
   toolsUsed,
   sources,
   charts,
+  pendingActions,
   isStreaming,
   error,
 }: ChatMessageProps) {
+  const confirmAction = useAiChatStore((s) => s.confirmAction);
+  const cancelAction = useAiChatStore((s) => s.cancelAction);
+
   if (role === 'user') {
     return (
       <div className="flex justify-end mb-4">
@@ -207,6 +223,20 @@ export function ChatMessage({
                 type={chart.type}
                 title={chart.title}
                 data={chart.data}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Human-in-the-loop write actions the assistant proposed */}
+        {pendingActions && pendingActions.length > 0 && (
+          <div className="mt-2 flex flex-col gap-2">
+            {pendingActions.map((action) => (
+              <TransactionConfirmationCard
+                key={action.actionId}
+                action={action}
+                onConfirm={() => confirmAction(id ?? '', action.actionId)}
+                onCancel={() => cancelAction(id ?? '', action.actionId)}
               />
             ))}
           </div>

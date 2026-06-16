@@ -5525,4 +5525,87 @@ describe("TransactionsService", () => {
       );
     });
   });
+
+  describe("previewCreate", () => {
+    it("resolves account + category and sanitizes strings without persisting", async () => {
+      categoriesRepository.findOne.mockResolvedValueOnce({
+        id: "cat-1",
+        userId: "user-1",
+        name: "Dining",
+      });
+
+      const preview = await service.previewCreate("user-1", {
+        accountId: "account-1",
+        amount: -12.5,
+        transactionDate: "2026-01-15",
+        payeeName: "Starbucks <script>",
+        categoryId: "cat-1",
+        description: undefined,
+      });
+
+      expect(accountsService.findOne).toHaveBeenCalledWith(
+        "user-1",
+        "account-1",
+      );
+      expect(preview).toMatchObject({
+        accountId: "account-1",
+        accountName: "Checking",
+        amount: -12.5,
+        categoryId: "cat-1",
+        categoryName: "Dining",
+        currencyCode: "USD",
+      });
+      expect(preview.payeeName).not.toContain("<");
+      expect(preview.description).toBeNull();
+      // Never writes.
+      expect(transactionsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("throws when the category is not owned", async () => {
+      categoriesRepository.findOne.mockResolvedValueOnce(null);
+      await expect(
+        service.previewCreate("user-1", {
+          accountId: "account-1",
+          amount: -1,
+          transactionDate: "2026-01-15",
+          categoryId: "cat-x",
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("previewCategorize", () => {
+    it("returns current and new category names without persisting", async () => {
+      transactionsRepository.findOne.mockResolvedValueOnce({
+        id: "tx-1",
+        userId: "user-1",
+        payeeName: "Starbucks",
+        amount: -12.5,
+        transactionDate: "2026-01-15",
+        account: { name: "Checking" },
+        category: { name: "Uncategorized" },
+      });
+      categoriesRepository.findOne.mockResolvedValueOnce({
+        id: "cat-1",
+        userId: "user-1",
+        name: "Dining",
+      });
+
+      const preview = await service.previewCategorize(
+        "user-1",
+        "tx-1",
+        "cat-1",
+      );
+
+      expect(preview).toMatchObject({
+        transactionId: "tx-1",
+        payeeName: "Starbucks",
+        accountName: "Checking",
+        currentCategoryName: "Uncategorized",
+        categoryId: "cat-1",
+        newCategoryName: "Dining",
+      });
+      expect(transactionsRepository.save).not.toHaveBeenCalled();
+    });
+  });
 });

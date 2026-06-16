@@ -128,11 +128,13 @@ export function ChatInterface() {
             {messages.map((msg) => (
               <ChatMessage
                 key={msg.id}
+                id={msg.id}
                 role={msg.role}
                 content={msg.content}
                 toolsUsed={msg.toolsUsed}
                 sources={msg.sources}
                 charts={msg.charts}
+                pendingActions={msg.pendingActions}
                 isStreaming={msg.isStreaming}
                 error={msg.error}
               />

@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "Une erreur inattendue s'est produite lors du traitement de votre requête.",
+    "actionSignatureInvalid": "Cette action n'a pas pu être vérifiée.",
+    "actionExpired": "Cette confirmation a expiré. Veuillez demander à nouveau.",
+    "actionWriteLimit": "Limite quotidienne d'écriture IA atteinte ({{ limit }} par jour). Veuillez réessayer demain.",
+    "actionConfirmFailed": "Cette action n'a pas pu être confirmée.",
     "providerConfigNotFound": "Configuration du fournisseur IA introuvable",
     "maxProvidersExceeded": "Maximum de {{ maxProvidersPerUser }} configurations de fournisseurs IA par utilisateur",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY n'est pas configuré. Impossible de stocker les clés API de manière sécurisée.",

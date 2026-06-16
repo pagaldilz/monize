@@ -13,6 +13,7 @@ import type {
   InsightsListResponse,
   InsightType,
   InsightSeverity,
+  ConfirmActionResponse,
 } from '@/types/ai';
 
 export const aiApi = {
@@ -170,6 +171,20 @@ export const aiApi = {
     })();
 
     return controller;
+  },
+
+  // Confirm a human-in-the-loop write action the assistant proposed. Uses the
+  // axios client so CSRF + 401-refresh are handled by the interceptors.
+  confirmAction: async (body: {
+    actionId: string;
+    signature: string;
+    descriptor: Record<string, unknown>;
+  }): Promise<ConfirmActionResponse> => {
+    const response = await apiClient.post<ConfirmActionResponse>(
+      '/ai/actions/confirm',
+      body,
+    );
+    return response.data;
   },
 
   // Spending Insights

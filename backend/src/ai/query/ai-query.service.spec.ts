@@ -1019,4 +1019,97 @@ describe("AiQueryService", () => {
       expect(messages[0].content).toBe("Message 10");
     });
   });
+
+  describe("pending_action (human-in-the-loop write tools)", () => {
+    const pendingAction = {
+      actionId: "act-1",
+      type: "create_transaction",
+      expiresAt: Date.now() + 60_000,
+      descriptor: { type: "create_transaction", userId, actionId: "act-1" },
+      signature: "secret-signature",
+      preview: { accountName: "Checking", amount: -12.5 },
+    };
+
+    it("emits a pending_action event and feeds the LLM only a safe status", async () => {
+      mockToolExecutor.execute.mockResolvedValueOnce({
+        data: { status: "preview_shown", message: "awaiting approval" },
+        summary: "Prepared a transaction. Awaiting user confirmation.",
+        sources: [],
+        pendingAction,
+      });
+      (mockProvider.completeWithTools as jest.Mock)
+        .mockResolvedValueOnce({
+          content: "",
+          toolCalls: [
+            {
+              id: "tc-1",
+              name: "create_transaction",
+              input: { amount: -12.5 },
+            },
+          ],
+          usage: { inputTokens: 80, outputTokens: 30 },
+          model: "m",
+          provider: "anthropic",
+          stopReason: "tool_use",
+        })
+        .mockResolvedValueOnce({
+          content: "Please review the card.",
+          toolCalls: [],
+          usage: { inputTokens: 10, outputTokens: 5 },
+          model: "m",
+          provider: "anthropic",
+          stopReason: "end_turn",
+        });
+
+      const events = await collectEvents(userId, "add a $12.50 expense");
+
+      const pending = events.find((e) => e.type === "pending_action");
+      expect(pending).toBeDefined();
+      expect((pending!.action as { actionId: string }).actionId).toBe("act-1");
+
+      // The signature must reach the browser but never the model: the tool
+      // result message fed back is built from the safe `data` only.
+      const secondCall = (mockProvider.completeWithTools as jest.Mock).mock
+        .calls[1];
+      const toolMessage = secondCall[0].messages.find(
+        (m: { role: string }) => m.role === "tool",
+      );
+      expect(toolMessage.content).toContain("preview_shown");
+      expect(toolMessage.content).not.toContain("secret-signature");
+    });
+
+    it("caps to one pending action per response", async () => {
+      mockToolExecutor.execute.mockResolvedValue({
+        data: { status: "preview_shown", message: "awaiting approval" },
+        summary: "Prepared a transaction.",
+        sources: [],
+        pendingAction,
+      });
+      (mockProvider.completeWithTools as jest.Mock)
+        .mockResolvedValueOnce({
+          content: "",
+          toolCalls: [
+            { id: "tc-1", name: "create_transaction", input: { amount: -1 } },
+            { id: "tc-2", name: "create_transaction", input: { amount: -2 } },
+          ],
+          usage: { inputTokens: 80, outputTokens: 30 },
+          model: "m",
+          provider: "anthropic",
+          stopReason: "tool_use",
+        })
+        .mockResolvedValueOnce({
+          content: "Review the card.",
+          toolCalls: [],
+          usage: { inputTokens: 10, outputTokens: 5 },
+          model: "m",
+          provider: "anthropic",
+          stopReason: "end_turn",
+        });
+
+      const events = await collectEvents(userId, "add two expenses");
+
+      const pendingEvents = events.filter((e) => e.type === "pending_action");
+      expect(pendingEvents).toHaveLength(1);
+    });
+  });
 });

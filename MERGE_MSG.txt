@@ -1,0 +1,31 @@
+Merge upstream/main into feat/ai-agent-chatbox
+
+Brings in 13 upstream commits including the human-in-the-loop write actions
+for the native AI Assistant, the z.nan() crash fix (tools/list), OAuth proxy
+fixes, and i18n backfills.
+
+Three conflicts, all in the MCP transactions-tool area, resolved by keeping
+HEAD (this branch's version). Rationale: this branch's MCP expansion
+(5d4d2e6a) built the full 16-tool transactions provider on top of upstream's
+old 8-tool read-only base. Upstream's human-in-the-loop PR (2bebc7e9) added
+write actions to the *native AI Assistant* (ai/query + a new ai/actions/
+module), not to the MCP transactions tool, so its version of
+transactions.tool.ts is still the 8-tool base. Keeping HEAD preserves all 16
+tools without losing upstream's actual additions, which auto-merged cleanly
+elsewhere (ai.module.ts gained AiActions* providers/controllers, PayeesModule;
+mcp-context.ts gained the nan->null sanitization; tool-output-schemas.ts
+gained z.nan() branches).
+
+Resolved files:
+- backend/src/mcp/tools/transactions.tool.ts: kept HEAD (16 tools, 4-param
+  constructor with AccountsService + TagsService).
+- backend/src/mcp/tools/transactions.tool.spec.ts: kept HEAD (matches the
+  4-param constructor).
+- backend/src/mcp/mcp-annotations.spec.ts: kept HEAD (4-arg instantiation).
+
+Verified: backend tsc --noEmit clean; all MCP (529) and AI (842) test suites
+pass, including the new ai-agent-tool-registry.spec.ts. The 13 failing suites
+are pre-existing environmental failures (9 integration suites need a live
+Postgres DB; loan-payment-detector/bill-reminder timeout on timers;
+auto-backup hits a Windows path-normalization issue; pseudo-locale is a
+CRLF/LF line-ending diff) — none relate to this merge.

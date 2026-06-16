@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "An unexpected error occurred while processing your query.",
+    "actionSignatureInvalid": "This action could not be verified.",
+    "actionExpired": "This confirmation has expired. Please ask again.",
+    "actionWriteLimit": "Daily AI write limit reached ({{ limit }} per day). Please try again tomorrow.",
+    "actionConfirmFailed": "This action could not be confirmed.",
     "providerConfigNotFound": "AI provider configuration not found",
     "maxProvidersExceeded": "Maximum of {{ maxProvidersPerUser }} AI provider configurations per user",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY is not configured. Cannot store API keys securely.",

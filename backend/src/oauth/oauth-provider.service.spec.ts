@@ -178,6 +178,9 @@ describe("OAuthProviderService", () => {
         revocation: "/oauth/token/revocation",
         userinfo: "/oauth/me",
         end_session: "/oauth/session/end",
+        // PAR pinned under /oauth/* so the proxy/root-mount gates forward it
+        // (its oidc-provider default `/request` is unreachable).
+        pushed_authorization_request: "/oauth/request",
       });
       expect(providerConstructorCalls[0].config.scopes).toEqual([
         ...MCP_RESOURCE_SCOPES,

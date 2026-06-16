@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "Si è verificato un errore imprevisto durante l'elaborazione della tua richiesta.",
+    "actionSignatureInvalid": "Impossibile verificare questa azione.",
+    "actionExpired": "Questa conferma è scaduta. Riprova a chiedere.",
+    "actionWriteLimit": "Limite giornaliero di scrittura IA raggiunto ({{ limit }} al giorno). Riprova domani.",
+    "actionConfirmFailed": "Impossibile confermare questa azione.",
     "providerConfigNotFound": "Configurazione provider AI non trovata",
     "maxProvidersExceeded": "Massimo {{ maxProvidersPerUser }} configurazioni di provider AI per utente",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY non è configurata. Impossibile archiviare le chiavi API in modo sicuro.",

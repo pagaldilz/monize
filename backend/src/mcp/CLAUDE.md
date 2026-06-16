@@ -120,11 +120,21 @@ Each export is a **Zod raw shape** (same form as `inputSchema`), not a `z.object
 Schemas are deliberately **tolerant** so they document shape without rejecting
 real runtime data:
 
-- Zod strips undeclared keys by default -- only model the fields you expose;
-  entity relations/timestamps are ignored automatically.
+- Build every object with the shared `looseObject(...)` helper, never bare
+  `z.object(...)`. Tools return entity payloads carrying fields beyond the
+  modeled subset (timestamps, foreign keys, relations). The SDK serializes each
+  schema to JSON Schema in **output mode** for `tools/list`, where a default
+  (strip) object becomes `additionalProperties: false` and the client rejects
+  the extra fields with an output-validation error. `looseObject` emits
+  `additionalProperties: {}`. (The server validates with Zod, which strips
+  unknown keys, so the strictness only bites on the client -- which is why it is
+  easy to miss.) Only model the fields you actually expose.
 - Money/decimals are numbers at runtime (entity `numericTransformer`). Use the
-  shared `num = z.number().or(z.nan())` so a divide-by-zero percentage (which
-  JSON-serializes to `null`) never fails validation.
+  shared `num` (`z.number().nullable()`). A divide-by-zero percentage is `NaN`
+  at runtime, which `toolResult` normalizes to `null` (NaN's JSON form). Do
+  **not** use `z.nan()` in a schema: the SDK's JSON Schema serialization throws
+  "NaN cannot be represented in JSON Schema", which fails the entire
+  `tools/list` response and leaves every client showing zero tools.
 - Use `.nullable()` for documented-null fields and `.optional()` for fields that
   may be absent (including alternate result branches, e.g. dry-run vs created,
   or success vs not-found error payloads -- make all branch fields optional).

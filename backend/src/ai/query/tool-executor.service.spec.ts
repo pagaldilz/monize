@@ -8,6 +8,9 @@ import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
+import { TransactionsService } from "../../transactions/transactions.service";
+import { PayeesService } from "../../payees/payees.service";
+import { AiActionSigningService } from "../actions/ai-action-signing.service";
 
 describe("ToolExecutorService", () => {
   let service: ToolExecutorService;
@@ -19,6 +22,9 @@ describe("ToolExecutorService", () => {
   let investmentTransactions: Record<string, jest.Mock>;
   let categories: Record<string, jest.Mock>;
   let scheduledTransactions: Record<string, jest.Mock>;
+  let transactions: Record<string, jest.Mock>;
+  let payees: Record<string, jest.Mock>;
+  let signing: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -81,8 +87,8 @@ describe("ToolExecutorService", () => {
 
     accounts = {
       findAll: jest.fn().mockResolvedValue([
-        { id: "acc-1", name: "Checking" },
-        { id: "acc-2", name: "Savings" },
+        { id: "acc-1", name: "Checking", currencyCode: "USD" },
+        { id: "acc-2", name: "Savings", currencyCode: "USD" },
       ]),
       getLlmBalances: jest.fn().mockResolvedValue({
         accounts: [
@@ -202,6 +208,58 @@ describe("ToolExecutorService", () => {
       }),
     };
 
+    transactions = {
+      getLlmTransactionRows: jest.fn().mockResolvedValue({
+        transactions: [
+          {
+            id: "tx-1",
+            date: "2026-01-15",
+            payeeName: "Starbucks",
+            categoryName: "Dining",
+            amount: -12.5,
+            accountName: "Checking",
+            description: null,
+            status: "unreconciled",
+          },
+        ],
+        total: 1,
+        hasMore: false,
+      }),
+      previewCreate: jest.fn().mockResolvedValue({
+        accountId: "acc-1",
+        accountName: "Checking",
+        amount: -12.5,
+        transactionDate: "2026-01-15",
+        payeeName: "Starbucks",
+        categoryId: "cat-1",
+        categoryName: "Dining",
+        description: null,
+        currencyCode: "USD",
+      }),
+      previewCategorize: jest.fn().mockResolvedValue({
+        transactionId: "tx-1",
+        payeeName: "Starbucks",
+        amount: -12.5,
+        transactionDate: "2026-01-15",
+        accountName: "Checking",
+        currentCategoryName: "Uncategorized",
+        categoryId: "cat-1",
+        newCategoryName: "Dining",
+      }),
+    };
+
+    payees = {
+      previewCreate: jest.fn().mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      }),
+    };
+
+    signing = {
+      sign: jest.fn().mockReturnValue("signature-abc"),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ToolExecutorService,
@@ -219,6 +277,9 @@ describe("ToolExecutorService", () => {
           provide: ScheduledTransactionsService,
           useValue: scheduledTransactions,
         },
+        { provide: TransactionsService, useValue: transactions },
+        { provide: PayeesService, useValue: payees },
+        { provide: AiActionSigningService, useValue: signing },
       ],
     }).compile();
 
@@ -799,6 +860,135 @@ describe("ToolExecutorService", () => {
       });
       expect(result.summary).toContain("Error executing query_transactions");
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("search_transactions", () => {
+    it("returns transaction rows resolving account/category names to ids", async () => {
+      const result = await service.execute(userId, "search_transactions", {
+        searchText: "coffee",
+        accountName: "Checking",
+        categoryName: "Dining",
+        limit: 10,
+      });
+
+      expect(accounts.findAll).toHaveBeenCalledWith(userId, false);
+      expect(analytics.resolveLlmCategoryIds).toHaveBeenCalledWith(userId, [
+        "Dining",
+      ]);
+      expect(transactions.getLlmTransactionRows).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          accountId: "acc-1",
+          categoryId: "cat-1",
+          query: "coffee",
+          limit: 10,
+        }),
+      );
+      expect(
+        (result.data as { transactions: unknown[] }).transactions,
+      ).toHaveLength(1);
+      expect(result.isError).toBeUndefined();
+    });
+
+    it("errors on an unknown account name", async () => {
+      const result = await service.execute(userId, "search_transactions", {
+        accountName: "Nope",
+      });
+      expect(transactions.getLlmTransactionRows).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("create_transaction (human-in-the-loop)", () => {
+    it("returns a signed pending action and never persists", async () => {
+      const result = await service.execute(userId, "create_transaction", {
+        accountName: "Checking",
+        amount: -12.5,
+        date: "2026-01-15",
+        payeeName: "Starbucks",
+        categoryName: "Dining",
+      });
+
+      expect(transactions.previewCreate).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ accountId: "acc-1", amount: -12.5 }),
+      );
+      // Never writes during the agentic loop.
+      expect(transactions.create).toBeUndefined();
+      expect(signing.sign).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("create_transaction");
+      expect(result.pendingAction?.signature).toBe("signature-abc");
+      expect(result.pendingAction?.descriptor).toMatchObject({
+        type: "create_transaction",
+        userId,
+        accountId: "acc-1",
+        amount: -12.5,
+        currencyCode: "USD",
+      });
+      expect(result.pendingAction?.preview).toMatchObject({
+        accountName: "Checking",
+        categoryName: "Dining",
+      });
+    });
+
+    it("does not leak the signature into the LLM-facing data", async () => {
+      const result = await service.execute(userId, "create_transaction", {
+        accountName: "Checking",
+        amount: -12.5,
+        date: "2026-01-15",
+      });
+      expect(JSON.stringify(result.data)).not.toContain("signature-abc");
+      expect((result.data as { status: string }).status).toBe("preview_shown");
+    });
+
+    it("errors on an unknown account", async () => {
+      const result = await service.execute(userId, "create_transaction", {
+        accountName: "Ghost",
+        amount: -1,
+        date: "2026-01-15",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.pendingAction).toBeUndefined();
+    });
+  });
+
+  describe("categorize_transaction (human-in-the-loop)", () => {
+    it("returns a signed pending action with current and new category", async () => {
+      const result = await service.execute(userId, "categorize_transaction", {
+        transactionId: "11111111-1111-4111-8111-111111111111",
+        categoryName: "Dining",
+      });
+
+      expect(transactions.previewCategorize).toHaveBeenCalledWith(
+        userId,
+        "11111111-1111-4111-8111-111111111111",
+        "cat-1",
+      );
+      expect(result.pendingAction?.type).toBe("categorize_transaction");
+      expect(result.pendingAction?.preview).toMatchObject({
+        currentCategoryName: "Uncategorized",
+        newCategoryName: "Dining",
+      });
+    });
+  });
+
+  describe("create_payee (human-in-the-loop)", () => {
+    it("returns a signed pending action", async () => {
+      const result = await service.execute(userId, "create_payee", {
+        name: "Acme",
+        defaultCategoryName: "Dining",
+      });
+
+      expect(payees.previewCreate).toHaveBeenCalledWith(userId, {
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+      });
+      expect(result.pendingAction?.type).toBe("create_payee");
+      expect(result.pendingAction?.preview).toMatchObject({
+        name: "Acme",
+        categoryName: "Dining",
+      });
     });
   });
 });

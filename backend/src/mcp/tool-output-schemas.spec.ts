@@ -565,6 +565,15 @@ describe("tool-output-schemas", () => {
       await client.connect(clientTransport);
 
       try {
+        // tools/list serializes every outputSchema to JSON Schema. An
+        // unrepresentable node (e.g. z.nan()) throws and fails the whole
+        // response, leaving clients with zero tools -- assert it succeeds and
+        // lists all registered tools.
+        const listed = await client.listTools();
+        expect(listed.tools.map((t) => t.name).sort()).toEqual(
+          e2eTools.map((t) => t.name).sort(),
+        );
+
         for (const tool of e2eTools) {
           const res = await client.callTool({ name: tool.name, arguments: {} });
           expect(res.isError).toBeFalsy();

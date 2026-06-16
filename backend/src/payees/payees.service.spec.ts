@@ -2007,4 +2007,45 @@ describe("PayeesService", () => {
       expect(result.aliasAdded).toBe(false);
     });
   });
+
+  describe("previewCreate", () => {
+    it("resolves the default category and returns a preview without persisting", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+      categoriesRepository.findOne.mockResolvedValue({
+        id: "cat-1",
+        userId,
+        name: "Dining",
+      });
+
+      const preview = await service.previewCreate(userId, {
+        name: "Acme <b>",
+        defaultCategoryId: "cat-1",
+      });
+
+      expect(preview.name).not.toContain("<");
+      expect(preview).toMatchObject({
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      });
+      expect(payeesRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("rejects a duplicate payee name", async () => {
+      payeesRepository.findOne.mockResolvedValue({ id: "p1", name: "Acme" });
+      await expect(
+        service.previewCreate(userId, { name: "Acme" }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects an unowned default category", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+      categoriesRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.previewCreate(userId, {
+          name: "Acme",
+          defaultCategoryId: "cat-x",
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });

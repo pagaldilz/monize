@@ -160,6 +160,51 @@ export interface ChartPayload {
   data: Array<{ label: string; value: number }>;
 }
 
+export type AiActionType = 'create_transaction' | 'categorize_transaction' | 'create_payee';
+
+export type PendingActionStatus =
+  | 'pending'
+  | 'confirming'
+  | 'confirmed'
+  | 'cancelled'
+  | 'error'
+  | 'expired';
+
+export interface PendingActionPreview {
+  accountName?: string;
+  amount?: number;
+  currencyCode?: string;
+  transactionDate?: string;
+  payeeName?: string | null;
+  categoryName?: string | null;
+  newCategoryName?: string | null;
+  currentCategoryName?: string | null;
+  description?: string | null;
+  name?: string | null;
+}
+
+/**
+ * A write action the assistant proposed via a `pending_action` SSE event. The
+ * `descriptor` + `signature` are echoed back verbatim to the confirm endpoint;
+ * `status` is client-side UI state tracked by the chat store.
+ */
+export interface PendingAction {
+  actionId: string;
+  type: AiActionType;
+  preview: PendingActionPreview;
+  descriptor: Record<string, unknown>;
+  signature: string;
+  expiresAt: number;
+  status: PendingActionStatus;
+  resultId?: string;
+  errorMessage?: string;
+}
+
+export interface ConfirmActionResponse {
+  type: AiActionType;
+  id: string;
+}
+
 export interface StreamEvent {
   type:
     | 'thinking'
@@ -167,6 +212,7 @@ export interface StreamEvent {
     | 'tool_start'
     | 'tool_result'
     | 'chart'
+    | 'pending_action'
     | 'content'
     | 'sources'
     | 'done'
@@ -188,6 +234,10 @@ export interface StreamEvent {
   // valid payload. The frontend attaches these to the active assistant
   // message so <ResultChart> can render them with recharts.
   chart?: ChartPayload;
+  // Emitted when the model proposes a write action (create/categorize). The
+  // frontend attaches it to the assistant message and renders a confirmation
+  // card the user must approve before anything is persisted.
+  action?: Omit<PendingAction, 'status'>;
 }
 
 export interface StreamCallbacks {

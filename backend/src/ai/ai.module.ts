@@ -24,9 +24,14 @@ import { InsightsAggregatorService } from "./insights/insights-aggregator.servic
 import { AiForecastService } from "./forecast/ai-forecast.service";
 import { AiForecastController } from "./forecast/ai-forecast.controller";
 import { ForecastAggregatorService } from "./forecast/forecast-aggregator.service";
+import { AiActionsController } from "./actions/ai-actions.controller";
+import { AiActionsService } from "./actions/ai-actions.service";
+import { AiActionSigningService } from "./actions/ai-action-signing.service";
+import { AiWriteLimiter } from "./actions/ai-write-limiter";
 import { AccountsModule } from "../accounts/accounts.module";
 import { CategoriesModule } from "../categories/categories.module";
 import { TransactionsModule } from "../transactions/transactions.module";
+import { PayeesModule } from "../payees/payees.module";
 import { NetWorthModule } from "../net-worth/net-worth.module";
 import { BudgetsModule } from "../budgets/budgets.module";
 import { SecuritiesModule } from "../securities/securities.module";
@@ -47,6 +52,7 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
     forwardRef(() => AccountsModule),
     forwardRef(() => CategoriesModule),
     forwardRef(() => TransactionsModule),
+    forwardRef(() => PayeesModule),
     forwardRef(() => NetWorthModule),
     forwardRef(() => BudgetsModule),
     SecuritiesModule,
@@ -65,12 +71,16 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
     InsightsAggregatorService,
     AiForecastService,
     ForecastAggregatorService,
+    AiActionsService,
+    AiActionSigningService,
+    AiWriteLimiter,
   ],
   controllers: [
     AiController,
     AiQueryController,
     AiInsightsController,
     AiForecastController,
+    AiActionsController,
   ],
   exports: [
     AiService,

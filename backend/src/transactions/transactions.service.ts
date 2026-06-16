@@ -47,6 +47,7 @@ import {
   escapeLikePattern,
 } from "./transaction-search.util";
 import { tr } from "../i18n/translate";
+import { stripHtml } from "../common/sanitization.util";
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
@@ -73,6 +74,36 @@ export interface LlmTransactionSearch {
   transactions: LlmTransactionRow[];
   total: number;
   hasMore: boolean;
+}
+
+/**
+ * Resolved, sanitized preview of a transaction the assistant proposes to
+ * create. Shared by the MCP `create_transaction` dry-run and the AI Assistant's
+ * human-in-the-loop confirmation flow so both surfaces validate ownership and
+ * resolve names identically.
+ */
+export interface CreateTransactionPreview {
+  accountId: string;
+  accountName: string;
+  amount: number;
+  transactionDate: string;
+  payeeName: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  description: string | null;
+  currencyCode: string;
+}
+
+/** Resolved preview of a proposed transaction re-categorization. */
+export interface CategorizeTransactionPreview {
+  transactionId: string;
+  payeeName: string | null;
+  amount: number;
+  transactionDate: string;
+  accountName: string | null;
+  currentCategoryName: string | null;
+  categoryId: string;
+  newCategoryName: string;
 }
 
 export { TransferResult };
@@ -234,6 +265,83 @@ export class TransactionsService {
     const result = await this.findOne(userId, savedTransactionId);
     this.recordTransactionAction(userId, result, "create");
     return result;
+  }
+
+  /**
+   * Validate and resolve a proposed transaction WITHOUT persisting it. Used by
+   * the MCP `create_transaction` dry-run and the AI Assistant confirmation
+   * flow. Validates account + category ownership and sanitizes user strings so
+   * the returned preview is exactly what `create()` would persist.
+   */
+  async previewCreate(
+    userId: string,
+    input: {
+      accountId: string;
+      amount: number;
+      transactionDate: string;
+      payeeName?: string;
+      categoryId?: string;
+      description?: string;
+    },
+  ): Promise<CreateTransactionPreview> {
+    const account = await this.accountsService.findOne(userId, input.accountId);
+
+    let categoryName: string | null = null;
+    if (input.categoryId) {
+      const cat = await this.categoriesRepository.findOne({
+        where: { id: input.categoryId, userId },
+      });
+      if (!cat) {
+        throw new NotFoundException(
+          tr("errors.transactions.categoryNotFound", "Category not found"),
+        );
+      }
+      categoryName = cat.name;
+    }
+
+    return {
+      accountId: input.accountId,
+      accountName: account.name,
+      amount: input.amount,
+      transactionDate: input.transactionDate,
+      payeeName: stripHtml(input.payeeName) || null,
+      categoryId: input.categoryId ?? null,
+      categoryName,
+      description: stripHtml(input.description) || null,
+      currencyCode: account.currencyCode,
+    };
+  }
+
+  /**
+   * Validate and resolve a proposed re-categorization WITHOUT persisting it.
+   * Confirms ownership of both the transaction and the target category and
+   * returns a preview (payee/amount/date plus current and new category names).
+   */
+  async previewCategorize(
+    userId: string,
+    transactionId: string,
+    categoryId: string,
+  ): Promise<CategorizeTransactionPreview> {
+    const transaction = await this.findOne(userId, transactionId);
+    const cat = await this.categoriesRepository.findOne({
+      where: { id: categoryId, userId },
+    });
+    if (!cat) {
+      throw new NotFoundException(
+        tr("errors.transactions.categoryNotFound", "Category not found"),
+      );
+    }
+
+    return {
+      transactionId,
+      payeeName: transaction.payeeName ?? null,
+      amount: Number(transaction.amount),
+      transactionDate: transaction.transactionDate,
+      accountName: transaction.account?.name ?? null,
+      currentCategoryName: transaction.category?.name ?? null,
+      categoryId,
+      newCategoryName: cat.name,
+    };
   }
 
   async getRecent(

@@ -1,0 +1,124 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@/test/render';
+import { TransactionConfirmationCard } from './TransactionConfirmationCard';
+import type { PendingAction } from '@/types/ai';
+
+function makeAction(overrides: Partial<PendingAction> = {}): PendingAction {
+  return {
+    actionId: 'a1',
+    type: 'create_transaction',
+    status: 'pending',
+    expiresAt: Date.now() + 60_000,
+    signature: 'sig',
+    descriptor: { type: 'create_transaction' },
+    preview: {
+      accountName: 'Checking',
+      amount: -12.5,
+      currencyCode: 'USD',
+      transactionDate: '2026-01-15',
+      payeeName: 'Starbucks',
+      categoryName: 'Dining',
+    },
+    ...overrides,
+  };
+}
+
+describe('TransactionConfirmationCard', () => {
+  it('renders the preview and Approve/Cancel for a pending action', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction()}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Create this transaction?')).toBeInTheDocument();
+    expect(screen.getByText('Checking')).toBeInTheDocument();
+    expect(screen.getByText('Starbucks')).toBeInTheDocument();
+    expect(screen.getByText('Dining')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+
+  it('fires onConfirm / onCancel when the buttons are clicked', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <TransactionConfirmationCard
+        action={makeAction()}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a success state with a view link once confirmed', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({ status: 'confirmed', resultId: 'tx-1' })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Transaction created')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View transaction' }),
+    ).toHaveAttribute('href', '/transactions');
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('shows an error message and a retry button on error', () => {
+    const onConfirm = vi.fn();
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({ status: 'error', errorMessage: 'Boom' })}
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Boom')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an expired notice and no actions', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({ status: 'expired' })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText('This confirmation expired. Ask again to retry.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('renders categorize previews with current and new category', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({
+          type: 'categorize_transaction',
+          preview: {
+            payeeName: 'Starbucks',
+            amount: -12.5,
+            currencyCode: 'USD',
+            transactionDate: '2026-01-15',
+            currentCategoryName: 'Uncategorized',
+            newCategoryName: 'Dining',
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Update this category?')).toBeInTheDocument();
+    expect(screen.getByText('Uncategorized')).toBeInTheDocument();
+    expect(screen.getByText('Dining')).toBeInTheDocument();
+  });
+});

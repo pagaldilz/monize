@@ -52,6 +52,7 @@ export interface StreamEvent {
     | "tool_start"
     | "tool_result"
     | "chart"
+    | "pending_action"
     | "content"
     | "sources"
     | "done"
@@ -207,6 +208,9 @@ export class AiQueryService {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let totalToolCalls = 0;
+    // Human-in-the-loop write tools may only surface one confirmation card per
+    // response, so a single turn can't queue up multiple pending writes.
+    let pendingActionsEmitted = 0;
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       this.logger.log(
@@ -449,8 +453,28 @@ export class AiQueryService {
           };
         }
 
+        // Human-in-the-loop write tools: emit the signed action so the frontend
+        // can render a confirmation card. The model never sees the signature --
+        // result.data holds the LLM-safe status. Cap to one proposal per turn.
+        let llmFacingData = result.data;
+        if (result.pendingAction) {
+          if (pendingActionsEmitted >= 1) {
+            llmFacingData = {
+              status: "not_proposed",
+              message:
+                "Only one action can be proposed per response. Ask the user to confirm the pending card before proposing another.",
+            };
+          } else {
+            pendingActionsEmitted++;
+            yield {
+              type: "pending_action",
+              action: result.pendingAction,
+            };
+          }
+        }
+
         // Add tool result message with sanitized string values
-        const sanitizedData = sanitizeToolResultStrings(result.data);
+        const sanitizedData = sanitizeToolResultStrings(llmFacingData);
         // LLM08-F2: Truncate oversized tool results to prevent context bloat
         let toolResultContent = JSON.stringify(sanitizedData);
         if (toolResultContent.length > MAX_TOOL_RESULT_CHARS) {

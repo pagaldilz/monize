@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { aiApi } from '@/lib/ai';
-import type { ChartPayload, StreamEvent } from '@/types/ai';
+import type { ChartPayload, PendingAction, StreamEvent } from '@/types/ai';
 
 // Key for persisting the AI conversation in the browser's localStorage.
 // Cleared on logout via authStore so conversations don't leak between accounts.
@@ -24,6 +24,9 @@ export interface ChatMessage {
   // `chart` SSE events arrive during streaming; rendered inline in
   // <ChatMessage> below the text content.
   charts?: ChartPayload[];
+  // Write actions the assistant proposed via `pending_action` events. Each is
+  // rendered as a confirmation card the user can approve or cancel.
+  pendingActions?: PendingAction[];
   isStreaming?: boolean;
   error?: string;
 }
@@ -64,9 +67,35 @@ interface AiChatState {
   submit: (query: string) => void;
   cancel: () => void;
   clear: () => void;
+  // Approve a proposed write action: posts it to the confirm endpoint and
+  // updates the card's status. No-op unless the action is still 'pending'.
+  confirmAction: (messageId: string, actionId: string) => Promise<void>;
+  // Dismiss a proposed write action locally (nothing was persisted).
+  cancelAction: (messageId: string, actionId: string) => void;
   // Heal stuck flags from a previous session that was killed mid-stream
   // (e.g. tab closed). Called once on rehydration.
   _heal: () => void;
+}
+
+/**
+ * Immutably patch a single pending action on a single message.
+ */
+function patchPendingAction(
+  messages: ChatMessage[],
+  messageId: string,
+  actionId: string,
+  patch: Partial<PendingAction>,
+): ChatMessage[] {
+  return messages.map((m) =>
+    m.id === messageId
+      ? {
+          ...m,
+          pendingActions: m.pendingActions?.map((a) =>
+            a.actionId === actionId ? { ...a, ...patch } : a,
+          ),
+        }
+      : m,
+  );
 }
 
 export const useAiChatStore = create<AiChatState>()(
@@ -104,6 +133,7 @@ export const useAiChatStore = create<AiChatState>()(
         // of the stream, independent of any React component.
         const toolsUsed: ToolCallRecord[] = [];
         const charts: ChartPayload[] = [];
+        const pendingActions: PendingAction[] = [];
         let sources: ChatMessage['sources'] = [];
         let contentBuffer = '';
         let hasStartedContent = false;
@@ -221,6 +251,23 @@ export const useAiChatStore = create<AiChatState>()(
                 }
                 break;
 
+              case 'pending_action':
+                if (event.action) {
+                  pendingActions.push({ ...event.action, status: 'pending' });
+                  // If the assistant message already exists, attach immediately
+                  // so the card shows mid-stream; otherwise 'content' picks it up.
+                  if (hasStartedContent) {
+                    set((state) => ({
+                      messages: state.messages.map((m) =>
+                        m.id === assistantMsgId
+                          ? { ...m, pendingActions: [...pendingActions] }
+                          : m,
+                      ),
+                    }));
+                  }
+                }
+                break;
+
               case 'content':
                 if (!hasStartedContent) {
                   hasStartedContent = true;
@@ -234,6 +281,10 @@ export const useAiChatStore = create<AiChatState>()(
                         content: event.text || '',
                         toolsUsed: [...toolsUsed],
                         charts: charts.length > 0 ? [...charts] : undefined,
+                        pendingActions:
+                          pendingActions.length > 0
+                            ? [...pendingActions]
+                            : undefined,
                         isStreaming: true,
                       },
                     ],
@@ -248,6 +299,10 @@ export const useAiChatStore = create<AiChatState>()(
                           content: contentBuffer,
                           toolsUsed: [...toolsUsed],
                           charts: charts.length > 0 ? [...charts] : m.charts,
+                          pendingActions:
+                            pendingActions.length > 0
+                              ? [...pendingActions]
+                              : m.pendingActions,
                         }
                       : m,
                   ),
@@ -268,6 +323,10 @@ export const useAiChatStore = create<AiChatState>()(
                           isStreaming: false,
                           sources,
                           charts: charts.length > 0 ? [...charts] : m.charts,
+                          pendingActions:
+                            pendingActions.length > 0
+                              ? [...pendingActions]
+                              : m.pendingActions,
                         }
                       : m,
                   ),
@@ -388,16 +447,87 @@ export const useAiChatStore = create<AiChatState>()(
         });
       },
 
+      confirmAction: async (messageId: string, actionId: string) => {
+        const message = get().messages.find((m) => m.id === messageId);
+        const action = message?.pendingActions?.find(
+          (a) => a.actionId === actionId,
+        );
+        // Guard against double-submit: only a pending action (or one that
+        // previously errored, for retry) is sendable.
+        if (!action || (action.status !== 'pending' && action.status !== 'error'))
+          return;
+
+        set((state) => ({
+          messages: patchPendingAction(state.messages, messageId, actionId, {
+            status: 'confirming',
+          }),
+        }));
+
+        try {
+          const res = await aiApi.confirmAction({
+            actionId: action.actionId,
+            signature: action.signature,
+            descriptor: action.descriptor,
+          });
+          set((state) => ({
+            messages: patchPendingAction(state.messages, messageId, actionId, {
+              status: 'confirmed',
+              resultId: res.id,
+            }),
+          }));
+        } catch (err) {
+          const errorMessage =
+            (err as { response?: { data?: { message?: string } } })?.response
+              ?.data?.message ||
+            (err as Error)?.message ||
+            'error';
+          set((state) => ({
+            messages: patchPendingAction(state.messages, messageId, actionId, {
+              status: 'error',
+              errorMessage,
+            }),
+          }));
+        }
+      },
+
+      cancelAction: (messageId: string, actionId: string) => {
+        const message = get().messages.find((m) => m.id === messageId);
+        const action = message?.pendingActions?.find(
+          (a) => a.actionId === actionId,
+        );
+        if (!action || action.status !== 'pending') return;
+        set((state) => ({
+          messages: patchPendingAction(state.messages, messageId, actionId, {
+            status: 'cancelled',
+          }),
+        }));
+      },
+
       _heal: () => {
         set((state) => {
           // After rehydration, no stream is actually running — the abort
           // controller from the previous tab/page is gone. Any persisted
-          // isStreaming flag is stale.
-          if (!state.messages.some((m) => m.isStreaming)) return {};
+          // isStreaming flag is stale, and any still-pending action card refers
+          // to a signature whose window may have closed, so mark it expired so
+          // a reloaded card cannot be confirmed against a stale signature.
+          const needsHeal = state.messages.some(
+            (m) =>
+              m.isStreaming ||
+              m.pendingActions?.some(
+                (a) => a.status === 'pending' || a.status === 'confirming',
+              ),
+          );
+          if (!needsHeal) return {};
           return {
-            messages: state.messages.map((m) =>
-              m.isStreaming ? { ...m, isStreaming: false } : m,
-            ),
+            messages: state.messages.map((m) => ({
+              ...m,
+              isStreaming: m.isStreaming ? false : m.isStreaming,
+              pendingActions: m.pendingActions?.map((a) =>
+                a.status === 'pending' || a.status === 'confirming'
+                  ? { ...a, status: 'expired' as const }
+                  : a,
+              ),
+            })),
           };
         });
       },

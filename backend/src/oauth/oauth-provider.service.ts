@@ -94,6 +94,13 @@ export class OAuthProviderService implements OnModuleInit {
         revocation: "/oauth/token/revocation",
         userinfo: "/oauth/me",
         end_session: "/oauth/session/end",
+        // PAR is enabled by default in oidc-provider v9. Its default route is
+        // the bare `/request`, which sits outside the `/oauth/*` namespace that
+        // both the root-mount gate (`isOidcProviderPath`) and the frontend
+        // proxy (`isOAuthPath`) forward — so an advertised PAR endpoint at
+        // `/request` is unreachable and 307s to /login, stalling clients that
+        // push their authorization request. Pin it under /oauth/* like the rest.
+        pushed_authorization_request: "/oauth/request",
       },
       cookies: {
         keys: [cookieKey],

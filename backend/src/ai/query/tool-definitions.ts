@@ -504,4 +504,130 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       required: ["type", "title", "data"],
     },
   },
+  {
+    name: "search_transactions",
+    description:
+      "Find individual transactions and return their IDs along with date, payee, amount, category, and account. Use this ONLY when you need a specific transaction's ID to act on it (for example before categorize_transaction), or when the user explicitly asks to see specific transactions. For totals, breakdowns, and spending questions use query_transactions instead. Returns a small capped list.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        searchText: {
+          type: "string",
+          description: "Match payee names or transaction descriptions.",
+        },
+        startDate: {
+          type: "string",
+          description: "Start date (YYYY-MM-DD).",
+        },
+        endDate: {
+          type: "string",
+          description: "End date (YYYY-MM-DD).",
+        },
+        accountName: {
+          type: "string",
+          description:
+            "Filter to a single account. Use an exact name from the user's account list.",
+        },
+        categoryName: {
+          type: "string",
+          description:
+            'Filter to a single category. Use an exact name from the user\'s category list ("Parent: Child" for a subcategory).',
+        },
+        minAmount: {
+          type: "number",
+          description: "Minimum signed amount (negative for expenses).",
+        },
+        maxAmount: {
+          type: "number",
+          description: "Maximum signed amount.",
+        },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: 25,
+          description:
+            "Maximum number of rows to return (1-25). Defaults to 25.",
+        },
+      },
+    },
+  },
+  {
+    name: "create_transaction",
+    description:
+      "Propose creating a new transaction. This does NOT create anything immediately: it shows the user a confirmation card they must explicitly approve before the transaction is saved. Use it only when the user clearly asks to add or record a transaction in their latest message. Amount is positive for income and negative for expenses. After calling this tool, briefly tell the user to review and approve the card; never claim the transaction was created.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        accountName: {
+          type: "string",
+          description:
+            "Account for the transaction. Use an exact name from the user's account list.",
+        },
+        amount: {
+          type: "number",
+          description:
+            "Signed amount: positive for income/inflow, negative for an expense/outflow. Up to 4 decimal places.",
+        },
+        date: {
+          type: "string",
+          description: "Transaction date (YYYY-MM-DD).",
+        },
+        payeeName: {
+          type: "string",
+          description: "Optional payee name.",
+        },
+        categoryName: {
+          type: "string",
+          description:
+            'Optional category. Use an exact name from the user\'s category list ("Parent: Child" for a subcategory).',
+        },
+        description: {
+          type: "string",
+          description: "Optional description or memo.",
+        },
+      },
+      required: ["accountName", "amount", "date"],
+    },
+  },
+  {
+    name: "categorize_transaction",
+    description:
+      "Propose assigning a category to an existing transaction. This does NOT change anything immediately: it shows the user a confirmation card they must approve. First call search_transactions to obtain the transactionId. After calling this tool, briefly tell the user to review and approve the card; never claim the change was applied.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        transactionId: {
+          type: "string",
+          description:
+            "ID of the transaction to categorize, obtained from search_transactions.",
+        },
+        categoryName: {
+          type: "string",
+          description:
+            'Category to assign. Use an exact name from the user\'s category list ("Parent: Child" for a subcategory).',
+        },
+      },
+      required: ["transactionId", "categoryName"],
+    },
+  },
+  {
+    name: "create_payee",
+    description:
+      "Propose creating a new payee. This does NOT create anything immediately: it shows the user a confirmation card they must approve. Use it only when the user clearly asks to add a payee. After calling this tool, briefly tell the user to review and approve the card; never claim the payee was created.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Payee name.",
+        },
+        defaultCategoryName: {
+          type: "string",
+          description:
+            "Optional default category for this payee. Use an exact name from the user's category list.",
+        },
+      },
+      required: ["name"],
+    },
+  },
 ];

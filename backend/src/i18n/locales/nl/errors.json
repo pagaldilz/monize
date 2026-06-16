@@ -60,6 +60,10 @@
   },
   "ai": {
     "queryStreamFailed": "Er is een onverwachte fout opgetreden bij het verwerken van je vraag.",
+    "actionSignatureInvalid": "Deze actie kon niet worden geverifieerd.",
+    "actionExpired": "Deze bevestiging is verlopen. Vraag het opnieuw.",
+    "actionWriteLimit": "Dagelijkse AI-schrijflimiet bereikt ({{ limit }} per dag). Probeer het morgen opnieuw.",
+    "actionConfirmFailed": "Deze actie kon niet worden bevestigd.",
     "providerConfigNotFound": "AI-providerconfiguratie niet gevonden",
     "maxProvidersExceeded": "Maximaal {{ maxProvidersPerUser }} AI-providerconfiguraties per gebruiker",
     "encryptionKeyNotConfigured": "AI_ENCRYPTION_KEY is niet geconfigureerd. Kan API-sleutels niet veilig opslaan.",

@@ -88,8 +88,35 @@ function toStructuredContent(data: unknown): Record<string, unknown> {
   return { value: data };
 }
 
+/**
+ * Recursively replace non-finite numbers (NaN, Infinity, -Infinity) with null.
+ *
+ * Structured-output validation runs against this in-memory object, and each
+ * tool's outputSchema is also serialized to JSON Schema for `tools/list`.
+ * Neither can represent NaN -- a `z.nan()` branch throws "NaN cannot be
+ * represented in JSON Schema" and fails the entire tools/list response, so
+ * clients see zero tools. null is exactly what JSON.stringify already emits for
+ * these values on the wire, so the normalization is lossless.
+ */
+function normalizeNonFiniteNumbers(data: unknown): unknown {
+  if (typeof data === "number") {
+    return Number.isFinite(data) ? data : null;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => normalizeNonFiniteNumbers(item));
+  }
+  if (data !== null && typeof data === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      result[key] = normalizeNonFiniteNumbers(value);
+    }
+    return result;
+  }
+  return data;
+}
+
 export function toolResult(data: unknown) {
-  const sanitized = sanitizeToolResultStrings(data);
+  const sanitized = normalizeNonFiniteNumbers(sanitizeToolResultStrings(data));
   return {
     content: [
       { type: "text" as const, text: JSON.stringify(sanitized, null, 2) },
