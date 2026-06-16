@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpServerService } from "./mcp-server.service";
 import { AiAgentToolRegistry } from "./ai-agent-tool-registry";
@@ -65,6 +66,21 @@ describe("AiAgentToolRegistry", () => {
                 },
               );
               server.registerTool(
+                "get_account_balance",
+                {
+                  title: "Get account balance",
+                  annotations: READ,
+                  description: "Get balance for an account.",
+                  inputSchema: { accountId: z.string().uuid() },
+                },
+                async (args: { accountId: string }, extra: { sessionId?: string }) => {
+                  const ctx = resolve(extra.sessionId);
+                  if (!ctx) return err("No user context");
+                  if (!ctx.scopes.split(",").includes("read")) return err('Insufficient scope. Requires "read" scope.');
+                  return ok({ id: args.accountId, balance: 0 });
+                },
+              );
+              server.registerTool(
                 "generate_report",
                 { title: "Generate report", annotations: READ, description: "Generate report.", inputSchema: {} },
                 async (_a: unknown, extra: { sessionId?: string }) => {
@@ -116,7 +132,13 @@ describe("AiAgentToolRegistry", () => {
   it("advertises only read-only tools when scopes omit 'write'", () => {
     const defs = registry.getToolDefinitions("read,reports");
     const names = defs.map((d) => d.name).sort();
-    expect(names).toEqual(["calculate", "generate_report", "get_accounts", "get_categories"]);
+    expect(names).toEqual([
+      "calculate",
+      "generate_report",
+      "get_account_balance",
+      "get_accounts",
+      "get_categories",
+    ]);
     // Write tools must be absent.
     expect(defs.find((d) => d.name === "create_transaction")).toBeUndefined();
     expect(defs.find((d) => d.name === "update_account")).toBeUndefined();
@@ -124,9 +146,15 @@ describe("AiAgentToolRegistry", () => {
 
   it("advertises all tools when scopes include 'write'", () => {
     const defs = registry.getToolDefinitions("read,reports,write");
-    expect(defs.map((d) => d.name).sort()).toEqual(
-      ["calculate", "create_transaction", "generate_report", "get_accounts", "get_categories", "update_account"],
-    );
+    expect(defs.map((d) => d.name).sort()).toEqual([
+      "calculate",
+      "create_transaction",
+      "generate_report",
+      "get_account_balance",
+      "get_accounts",
+      "get_categories",
+      "update_account",
+    ]);
   });
 
   it("classifies write vs read tools via isWriteTool()", () => {
@@ -177,6 +205,35 @@ describe("AiAgentToolRegistry", () => {
     const sid = registry.beginSession("user-1", "read,reports");
     const result = await registry.callTool("get_accounts", {}, sid);
     expect(result.isError).toBeFalsy();
+    registry.endSession(sid);
+  });
+
+  it("rejects invalid input (e.g. placeholder UUID) before reaching the handler", async () => {
+    // Regression: the model passed accountId: "placeholder" and the raw value
+    // reached the DB, crashing with "invalid input syntax for type uuid".
+    // Now the Zod schema rejects it in-process and returns a clean error.
+    const sid = registry.beginSession("user-1", "read,reports");
+    const result = await registry.callTool(
+      "get_account_balance",
+      { accountId: "placeholder" },
+      sid,
+    );
+    expect(result.isError).toBe(true);
+    const text = textOf(result);
+    expect(text).toContain("get_account_balance");
+    expect(text.toLowerCase()).toContain("uuid");
+    registry.endSession(sid);
+  });
+
+  it("accepts valid input and passes parsed args to the handler", async () => {
+    const sid = registry.beginSession("user-1", "read,reports");
+    const result = await registry.callTool(
+      "get_account_balance",
+      { accountId: "00000000-0000-0000-0000-000000000000" },
+      sid,
+    );
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain("00000000-0000-0000-0000-000000000000");
     registry.endSession(sid);
   });
 });

@@ -179,11 +179,63 @@ export class AiAgentToolRegistry {
   }
 
   /**
+   * Parse the model's raw arguments through the tool's Zod input shape.
+   *
+   * The SDK stores `RegisteredTool.inputSchema` as a Zod object schema built
+   * from the raw shape passed to `registerTool`. On success we return the
+   * parsed (and therefore coerced/defaulted) values the handler should see.
+   * On failure we return a `{ __validationError }` sentinel carrying a
+   * human/model-readable message listing the offending fields.
+   *
+   * Tools registered with an empty `{}` shape have no constraints, so their
+   * input passes through unchanged.
+   */
+  private parseInput(
+    inputSchema: unknown,
+    input: Record<string, unknown>,
+    toolName: string,
+  ): Record<string, unknown> | { __validationError: string } {
+    if (!inputSchema) return input;
+    try {
+      // The SDK exposes the wrapped Zod schema; `safeParse` is the standard
+      // Zod API and never throws. We only accept a clean success — any issue
+      // (bad type, failed .uuid(), missing required field) becomes an error.
+      const parsed = (inputSchema as any).safeParse(input);
+      if (parsed.success) {
+        return parsed.data as Record<string, unknown>;
+      }
+      // Build a concise message from the Zod issues, e.g.:
+      //   "Invalid arguments for create_transaction: accountId: Invalid uuid"
+      const issues = parsed.error.issues
+        .map((i: { path: PropertyKey[]; message: string }) => {
+          const field = i.path.length > 0 ? i.path.join(".") : "(root)";
+          return `${field}: ${i.message}`;
+        })
+        .join("; ");
+      return {
+        __validationError: `Invalid arguments for ${toolName}: ${issues}`,
+      };
+    } catch {
+      // If the schema isn't actually a Zod schema (defensive), pass through.
+      return input;
+    }
+  }
+
+  /**
    * Invoke a registered tool's handler directly, in-process.
    *
    * Returns the raw {@link CallToolResult} (content blocks + structuredContent
    * + isError flag) exactly as the MCP transport would. The agent service
    * interprets `isError` and the text content block.
+   *
+   * Input is parsed through the tool's Zod `inputSchema` before the handler
+   * runs. This mirrors the validation the MCP transport performs on inbound
+   * JSON-RPC `tools/call` requests — without it, a model that passes invalid
+   * arguments (e.g. a hallucinated `accountId: "placeholder"`) would reach
+   * the handler and the database query underneath, producing a raw Postgres
+   * error ("invalid input syntax for type uuid") instead of a clean, model-
+   * readable validation message. The parsed (coerced/ defaulted) values are
+   * what the handler actually receives.
    */
   async callTool(
     name: string,
@@ -200,9 +252,23 @@ export class AiAgentToolRegistry {
         isError: true,
       };
     }
+
+    // Validate + coerce the model's arguments against the tool's input shape.
+    // On failure, return a readable error so the agent can correct itself
+    // (e.g. call get_accounts first to resolve a real id) instead of crashing
+    // the downstream service call.
+    const validated = this.parseInput(tool.inputSchema, input, name);
+    if ("__validationError" in validated) {
+      const message = (validated as { __validationError: string }).__validationError;
+      return {
+        content: [{ type: "text", text: message }],
+        isError: true,
+      };
+    }
+
     try {
       const result = await (tool.handler as any)(
-        input,
+        validated,
         buildSyntheticExtra(sessionId),
       );
       return (result ?? {
