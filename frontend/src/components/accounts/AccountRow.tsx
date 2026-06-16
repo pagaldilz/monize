@@ -40,8 +40,15 @@ export function buildAccountActions(
   isDeletable: boolean,
   labels: AccountActionLabels,
   handlers: AccountActionHandlers,
+  brokerageMarketValue?: number,
 ): RowAction[] {
-  const balanceNonZero = Number(account.currentBalance) !== 0;
+  // Brokerage accounts display their holdings' market value rather than the
+  // cash `currentBalance` (which is usually zero), so a brokerage with
+  // securities must block closure based on that market value instead.
+  const balanceNonZero =
+    account.accountSubType === 'INVESTMENT_BROKERAGE' && brokerageMarketValue !== undefined
+      ? Math.round(brokerageMarketValue * 10000) !== 0
+      : Number(account.currentBalance) !== 0;
   return [
     {
       key: 'view',
@@ -157,7 +164,7 @@ export const AccountRow = memo(function AccountRow({
     onCloseClick,
     onReopen,
     onDeleteClick,
-  });
+  }, brokerageMarketValue);
   return (
     <tr
       className={`group hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer select-none ${density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'}`}

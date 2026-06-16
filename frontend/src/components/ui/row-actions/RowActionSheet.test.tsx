@@ -47,4 +47,16 @@ describe('RowActionSheet', () => {
     const deleteBtn = screen.getByText('Delete').closest('button');
     expect(deleteBtn?.className).toContain('text-red-600');
   });
+
+  it('tints non-destructive icons with the action tone color (matching the ACTIONS column)', () => {
+    const actions: RowAction[] = [
+      { key: 'edit', label: 'Edit', icon: 'edit', tone: 'primary', onClick: vi.fn() },
+      { key: 'merge', label: 'Merge', icon: 'merge', tone: 'accent', onClick: vi.fn() },
+    ];
+    render(<RowActionSheet isOpen title="X" actions={actions} onClose={vi.fn()} />);
+    const editIcon = screen.getByText('Edit').closest('button')?.querySelector('svg');
+    const mergeIcon = screen.getByText('Merge').closest('button')?.querySelector('svg');
+    expect(editIcon?.getAttribute('class')).toContain('text-blue-600');
+    expect(mergeIcon?.getAttribute('class')).toContain('text-purple-600');
+  });
 });

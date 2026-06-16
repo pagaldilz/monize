@@ -495,6 +495,38 @@ describe('AccountRow', () => {
       expect(closeButton).not.toBeDisabled();
     });
 
+    it('disables Close button for brokerage accounts with non-zero market value', () => {
+      const props = createDefaultProps({
+        density: 'normal',
+        account: createAccount({
+          isClosed: false,
+          currentBalance: 0,
+          accountSubType: 'INVESTMENT_BROKERAGE',
+        }),
+        brokerageMarketValue: 25000,
+      });
+      renderAccountRow(props);
+
+      const closeButton = screen.getByText('Close');
+      expect(closeButton).toBeDisabled();
+    });
+
+    it('enables Close button for brokerage accounts with zero market value', () => {
+      const props = createDefaultProps({
+        density: 'normal',
+        account: createAccount({
+          isClosed: false,
+          currentBalance: 0,
+          accountSubType: 'INVESTMENT_BROKERAGE',
+        }),
+        brokerageMarketValue: 0,
+      });
+      renderAccountRow(props);
+
+      const closeButton = screen.getByText('Close');
+      expect(closeButton).not.toBeDisabled();
+    });
+
     it('calls onCloseClick when Close button is clicked', () => {
       const onCloseClick = vi.fn();
       const account = createAccount({ isClosed: false, currentBalance: 0 });

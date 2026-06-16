@@ -13,7 +13,7 @@ const ACTION_ICON_PATHS: Record<ActionIconKey, string> = {
     'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
   duplicate:
     'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
-  merge: 'M7 8l-4 4 4 4m-4-4h11a4 4 0 004-4V6',
+  merge: 'M4 7h4c4 0 4 5 8 5h4M4 17h4c4 0 4-5 8-5M16 8l4 4-4 4',
   reconcile: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   post: 'M5 13l4 4L19 7',
   skip: 'M13 5l7 7-7 7M5 5l7 7-7 7',

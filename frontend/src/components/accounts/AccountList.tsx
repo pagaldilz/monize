@@ -758,7 +758,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
               onCloseClick: handleCloseClick,
               onReopen: handleReopen,
               onDeleteClick: handleDeleteClick,
-            })
+            }, brokerageMarketValues?.get(contextAccount.id))
           : []}
         onClose={() => setContextAccount(null)}
       />

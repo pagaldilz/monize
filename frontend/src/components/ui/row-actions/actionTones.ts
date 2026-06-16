@@ -17,15 +17,17 @@ export const TONE_TEXT_CLASS: Record<ActionTone, string> = {
 };
 
 /**
- * Icon tint for an action-sheet (mobile) row. Destructive actions are red; every
- * other verb is neutral gray, matching the original TransactionActionSheet.
+ * Icon tint for an action-sheet (popup modal) row. Mirrors the per-verb colors
+ * of the desktop ACTIONS column (`TONE_TEXT_CLASS`) so the same verb shows the
+ * same color in the table and the popup. Hover variants are omitted because the
+ * sheet's hover state is a row background change, not a text-color change.
  */
 export const TONE_SHEET_ICON_CLASS: Record<ActionTone, string> = {
-  primary: 'text-gray-400',
-  view: 'text-gray-400',
+  primary: 'text-blue-600 dark:text-blue-400',
+  view: 'text-emerald-600 dark:text-emerald-400',
   delete: 'text-red-600 dark:text-red-400',
-  success: 'text-gray-400',
-  warning: 'text-gray-400',
-  accent: 'text-gray-400',
-  neutral: 'text-gray-400',
+  success: 'text-green-600 dark:text-green-400',
+  warning: 'text-orange-600 dark:text-orange-400',
+  accent: 'text-purple-600 dark:text-purple-400',
+  neutral: 'text-gray-500 dark:text-gray-400',
 };
