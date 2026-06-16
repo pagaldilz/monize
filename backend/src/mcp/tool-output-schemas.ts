@@ -817,7 +817,10 @@ export const unreconcileTransactionOutput = {
 };
 
 // accounts.tool.ts (Phase 2)
-export const createAccountOutput = {
+// Single-account return (common types, loans, mortgages, single investment).
+// All fields except `message` are optional because the investment-pair branch
+// (below) returns cashAccount/brokerageAccount instead of the top-level fields.
+const accountSummary = looseObject({
   id: str,
   name: str,
   accountType: str.optional(),
@@ -825,6 +828,18 @@ export const createAccountOutput = {
   openingBalance: num.optional(),
   currentBalance: num.optional(),
   isClosed: bool.optional(),
+});
+export const createAccountOutput = {
+  id: str.optional(),
+  name: str.optional(),
+  accountType: str.optional(),
+  currencyCode: str.optional(),
+  openingBalance: num.optional(),
+  currentBalance: num.optional(),
+  isClosed: bool.optional(),
+  // Investment-pair return (createInvestmentPair=true): two linked accounts.
+  cashAccount: accountSummary.optional(),
+  brokerageAccount: accountSummary.optional(),
   message: str,
 };
 

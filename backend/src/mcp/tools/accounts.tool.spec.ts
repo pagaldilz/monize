@@ -1,5 +1,6 @@
 import { McpAccountsTools } from "./accounts.tool";
 import { UserContextResolver } from "../mcp-context";
+import { BadRequestException } from "@nestjs/common";
 
 describe("McpAccountsTools", () => {
   let tool: McpAccountsTools;
@@ -14,6 +15,7 @@ describe("McpAccountsTools", () => {
       findOne: jest.fn(),
       getSummary: jest.fn(),
       getLlmBalances: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
       close: jest.fn(),
       reopen: jest.fn(),
@@ -195,6 +197,232 @@ describe("McpAccountsTools", () => {
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("create_account", () => {
+    beforeEach(() => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+    });
+
+    it("creates a single INVESTMENT account from name + currency only", async () => {
+      accountsService.create.mockResolvedValue({
+        id: "inv-1",
+        name: "Brokerage",
+        accountType: "INVESTMENT",
+        currencyCode: "USD",
+        openingBalance: 0,
+        currentBalance: 0,
+        isClosed: false,
+      });
+
+      const result = await handlers["create_account"](
+        {
+          accountType: "INVESTMENT",
+          name: "Brokerage",
+          currencyCode: "usd",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(result.isError).toBeUndefined();
+      // currencyCode is uppercased before being forwarded
+      expect(accountsService.create).toHaveBeenCalledWith("u1", {
+        accountType: "INVESTMENT",
+        name: "Brokerage",
+        currencyCode: "USD",
+      });
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("inv-1");
+      expect(parsed.message).toBe("Account created successfully.");
+      // pair fields should be absent on the single-account path
+      expect(parsed.cashAccount).toBeUndefined();
+      expect(parsed.brokerageAccount).toBeUndefined();
+    });
+
+    it("creates an INVESTMENT cash+brokerage pair when createInvestmentPair=true", async () => {
+      accountsService.create.mockResolvedValue({
+        cashAccount: {
+          id: "cash-1",
+          name: "Investment Cash",
+          accountType: "INVESTMENT",
+          currencyCode: "USD",
+          openingBalance: 5000,
+          currentBalance: 5000,
+          isClosed: false,
+        },
+        brokerageAccount: {
+          id: "brok-1",
+          name: "Investment Brokerage",
+          accountType: "INVESTMENT",
+          currencyCode: "USD",
+          openingBalance: 0,
+          currentBalance: 0,
+          isClosed: false,
+        },
+      });
+
+      const result = await handlers["create_account"](
+        {
+          accountType: "INVESTMENT",
+          name: "Brokerage",
+          currencyCode: "USD",
+          openingBalance: 5000,
+          createInvestmentPair: true,
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(result.isError).toBeUndefined();
+      expect(accountsService.create).toHaveBeenCalledWith("u1", {
+        accountType: "INVESTMENT",
+        name: "Brokerage",
+        currencyCode: "USD",
+        openingBalance: 5000,
+        createInvestmentPair: true,
+      });
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.cashAccount.id).toBe("cash-1");
+      expect(parsed.brokerageAccount.id).toBe("brok-1");
+      expect(parsed.message).toContain("pair");
+    });
+
+    it("forwards loan payment-plan fields to the service", async () => {
+      accountsService.create.mockResolvedValue({
+        id: "loan-1",
+        name: "Car Loan",
+        accountType: "LOAN",
+        currencyCode: "USD",
+        openingBalance: -20000,
+        currentBalance: -20000,
+        isClosed: false,
+      });
+
+      const result = await handlers["create_account"](
+        {
+          accountType: "LOAN",
+          name: "Car Loan",
+          currencyCode: "USD",
+          openingBalance: 20000,
+          institution: "Big Bank",
+          interestRate: 6.5,
+          paymentAmount: 400,
+          paymentFrequency: "MONTHLY",
+          paymentStartDate: "2026-07-01",
+          sourceAccountId: "11111111-1111-1111-1111-111111111111",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(result.isError).toBeUndefined();
+      expect(accountsService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          accountType: "LOAN",
+          openingBalance: 20000,
+          institution: "Big Bank",
+          interestRate: 6.5,
+          paymentAmount: 400,
+          paymentFrequency: "MONTHLY",
+          paymentStartDate: "2026-07-01",
+          sourceAccountId: "11111111-1111-1111-1111-111111111111",
+        }),
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("loan-1");
+    });
+
+    it("forwards mortgage-specific fields to the service", async () => {
+      accountsService.create.mockResolvedValue({
+        id: "mort-1",
+        name: "Home",
+        accountType: "MORTGAGE",
+        currencyCode: "USD",
+        openingBalance: -350000,
+        currentBalance: -350000,
+        isClosed: false,
+      });
+
+      const result = await handlers["create_account"](
+        {
+          accountType: "MORTGAGE",
+          name: "Home",
+          currencyCode: "USD",
+          openingBalance: 350000,
+          institution: "Big Bank",
+          interestRate: 5.99,
+          mortgagePaymentFrequency: "MONTHLY",
+          paymentStartDate: "2026-07-01",
+          sourceAccountId: "11111111-1111-1111-1111-111111111111",
+          amortizationMonths: 300,
+          isCanadianMortgage: true,
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(result.isError).toBeUndefined();
+      expect(accountsService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          accountType: "MORTGAGE",
+          mortgagePaymentFrequency: "MONTHLY",
+          amortizationMonths: 300,
+          isCanadianMortgage: true,
+        }),
+      );
+    });
+
+    it("surfaces a service BadRequestException as a clear tool error", async () => {
+      // The loan service throws 400 when required payment fields are missing.
+      accountsService.create.mockRejectedValue(
+        new BadRequestException(
+          "Loan accounts require paymentAmount, paymentFrequency, paymentStartDate, and sourceAccountId",
+        ),
+      );
+
+      const result = await handlers["create_account"](
+        {
+          accountType: "LOAN",
+          name: "Bad Loan",
+          currencyCode: "USD",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(result.isError).toBe(true);
+      // safeToolError passes the 4xx message through (not the generic "An error occurred")
+      expect(result.content[0].text).toContain("paymentAmount");
+    });
+
+    it("strips HTML from free-text fields", async () => {
+      accountsService.create.mockResolvedValue({
+        id: "a1",
+        name: "Safe",
+        accountType: "SAVINGS",
+        currencyCode: "USD",
+        openingBalance: 0,
+        currentBalance: 0,
+        isClosed: false,
+      });
+
+      await handlers["create_account"](
+        {
+          accountType: "SAVINGS",
+          name: "<script>x</script>Savings",
+          currencyCode: "USD",
+          description: "<b>desc</b>",
+          institution: "<i>bank</i>",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(accountsService.create).toHaveBeenCalledWith("u1", {
+        accountType: "SAVINGS",
+        name: expect.not.stringContaining("<script>"),
+        currencyCode: "USD",
+        description: expect.not.stringContaining("<b>"),
+        institution: expect.not.stringContaining("<i>"),
+      });
     });
   });
 });

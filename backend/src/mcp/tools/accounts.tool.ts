@@ -4,6 +4,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccountsService } from "../../accounts/accounts.service";
 import { AccountType, Account } from "../../accounts/entities/account.entity";
 import {
+  PAYMENT_FREQUENCIES,
+  MORTGAGE_PAYMENT_FREQUENCIES,
+} from "../../accounts/dto/create-account.dto";
+import {
   UserContextResolver,
   requireScope,
   toolResult,
@@ -156,12 +160,12 @@ export class McpAccountsTools {
         title: "Create account",
         annotations: CREATE,
         description:
-          "Create a new account. Requires an account type, a name, and a 3-letter currency code (e.g. USD). Optionally set the opening balance (defaults to 0), description, account number, institution, credit limit, interest rate, and favourite/exclude-from-net-worth flags. Returns the new account's id and starting balance. Creating loans, mortgages, or paired investment accounts requires additional fields and remains on the REST API — use this tool only for the common account types (chequing, savings, credit card, cash, line of credit, asset, other).",
+          "Create a new account. Common types (CHEQUING, SAVINGS, CREDIT_CARD, CASH, LINE_OF_CREDIT, ASSET, OTHER) need only accountType + name + currencyCode (openingBalance defaults to 0). INVESTMENT also needs just name + currency; set createInvestmentPair=true to create a linked cash + brokerage pair in one call. LOAN and MORTGAGE need more: the loan/mortgage principal as openingBalance, an annual interestRate, the lender's name as institution, a sourceAccountId (an existing account the payments will be drawn from), a paymentStartDate (YYYY-MM-DD), and a payment schedule (paymentAmount + paymentFrequency for loans; amortizationMonths + mortgagePaymentFrequency for mortgages — the mortgage payment amount is derived for you). Returns the new account's id and starting balance. Tip: for loans/mortgages you can first call preview_loan_amortization / preview_mortgage_amortization to show the user the projected payoff before creating.",
         inputSchema: {
           accountType: z
             .nativeEnum(AccountType)
             .describe(
-              "Account type. One of: CHEQUING, SAVINGS, CREDIT_CARD, CASH, LINE_OF_CREDIT, ASSET, OTHER. (LOAN, MORTGAGE, and INVESTMENT require the REST API.)",
+              "Account type. One of: CHEQUING, SAVINGS, CREDIT_CARD, LOAN, MORTGAGE, INVESTMENT, CASH, LINE_OF_CREDIT, ASSET, OTHER.",
             ),
           name: z.string().max(100).describe("Account name"),
           currencyCode: z
@@ -224,6 +228,86 @@ export class McpAccountsTools {
             .describe(
               "Exclude this account from net worth calculations (default false)",
             ),
+          // Investment pairing
+          createInvestmentPair: z
+            .boolean()
+            .optional()
+            .describe(
+              "INVESTMENT only. When true, creates a linked cash (INVESTMENT_CASH) + brokerage (INVESTMENT_BROKERAGE) account pair. openingBalance is applied to the cash half; the brokerage half starts at 0. Default false = single investment account.",
+            ),
+          // Loan & mortgage payment-plan fields
+          paymentAmount: z
+            .number()
+            .min(0.01)
+            .max(999999999999)
+            .optional()
+            .describe(
+              "LOAN only (required). Payment amount per period.",
+            ),
+          paymentFrequency: z
+            .enum(PAYMENT_FREQUENCIES)
+            .optional()
+            .describe(
+              "LOAN only (required). One of: WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, YEARLY.",
+            ),
+          mortgagePaymentFrequency: z
+            .enum(MORTGAGE_PAYMENT_FREQUENCIES)
+            .optional()
+            .describe(
+              "MORTGAGE only (required). One of: MONTHLY, SEMI_MONTHLY, BIWEEKLY, ACCELERATED_BIWEEKLY, WEEKLY, ACCELERATED_WEEKLY.",
+            ),
+          paymentStartDate: z
+            .string()
+            .max(10)
+            .optional()
+            .describe(
+              "LOAN/MORTGAGE (required). First payment date (YYYY-MM-DD).",
+            ),
+          sourceAccountId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              "LOAN/MORTGAGE (required). UUID of the existing account that loan/mortgage payments will be drawn from (e.g. the user's chequing account).",
+            ),
+          interestCategoryId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              "LOAN/MORTGAGE. Category for the interest portion of payments. If omitted, the service auto-selects a 'Loan Interest' category.",
+            ),
+          // Mortgage-specific fields
+          amortizationMonths: z
+            .number()
+            .int()
+            .min(1)
+            .max(600)
+            .optional()
+            .describe(
+              "MORTGAGE only (required). Total amortization period in months (e.g. 300 = 25 years).",
+            ),
+          termMonths: z
+            .number()
+            .int()
+            .min(0)
+            .max(600)
+            .optional()
+            .describe(
+              "MORTGAGE. Mortgage term length in months (e.g. 60 = 5-year term). 0 means no term.",
+            ),
+          isCanadianMortgage: z
+            .boolean()
+            .optional()
+            .describe(
+              "MORTGAGE. If true, use Canadian semi-annual compounding (fixed rate). Default false (US-style monthly compounding).",
+            ),
+          isVariableRate: z
+            .boolean()
+            .optional()
+            .describe(
+              "MORTGAGE. If true (Canadian), use monthly compounding for a variable rate. Default false.",
+            ),
         },
         outputSchema: createAccountOutput,
       },
@@ -240,24 +324,12 @@ export class McpAccountsTools {
           );
         }
 
-        // Block the specialized account types that need multi-field
-        // orchestration the REST API handles (loan/mortgage payment plans,
-        // investment cash+brokerage pairs). Mirrors update_account's note.
-        if (
-          args.accountType === AccountType.LOAN ||
-          args.accountType === AccountType.MORTGAGE ||
-          args.accountType === AccountType.INVESTMENT
-        ) {
-          return toolError(
-            `Creating ${args.accountType} accounts requires payment-plan / pairing details that this tool doesn't support. Please create it via the Monize app's Add Account flow, then I can update it.`,
-          );
-        }
-
         try {
-          // create() returns Account | { cashAccount, brokerageAccount }, but
-          // only the INVESTMENT branch yields the pair — and we block that
-          // above. Cast so we can read the single-account fields below.
-          const account = (await this.accountsService.create(ctx.userId, {
+          // create() returns Account for the common types and for loans,
+          // mortgages, and single investment accounts; it returns
+          // { cashAccount, brokerageAccount } when an INVESTMENT pair is
+          // requested (createInvestmentPair=true).
+          const result = (await this.accountsService.create(ctx.userId, {
             accountType: args.accountType,
             name: stripHtml(args.name) as string,
             currencyCode: (args.currencyCode as string).toUpperCase(),
@@ -290,10 +362,77 @@ export class McpAccountsTools {
             ...(args.excludeFromNetWorth !== undefined && {
               excludeFromNetWorth: args.excludeFromNetWorth,
             }),
-          })) as Account;
+            // Investment pairing
+            ...(args.createInvestmentPair !== undefined && {
+              createInvestmentPair: args.createInvestmentPair,
+            }),
+            // Loan & mortgage payment-plan fields
+            ...(args.paymentAmount !== undefined && {
+              paymentAmount: args.paymentAmount,
+            }),
+            ...(args.paymentFrequency !== undefined && {
+              paymentFrequency: args.paymentFrequency,
+            }),
+            ...(args.mortgagePaymentFrequency !== undefined && {
+              mortgagePaymentFrequency: args.mortgagePaymentFrequency,
+            }),
+            ...(args.paymentStartDate !== undefined && {
+              paymentStartDate: args.paymentStartDate,
+            }),
+            ...(args.sourceAccountId !== undefined && {
+              sourceAccountId: args.sourceAccountId,
+            }),
+            ...(args.interestCategoryId !== undefined && {
+              interestCategoryId: args.interestCategoryId,
+            }),
+            // Mortgage-specific fields
+            ...(args.amortizationMonths !== undefined && {
+              amortizationMonths: args.amortizationMonths,
+            }),
+            ...(args.termMonths !== undefined && {
+              termMonths: args.termMonths,
+            }),
+            ...(args.isCanadianMortgage !== undefined && {
+              isCanadianMortgage: args.isCanadianMortgage,
+            }),
+            ...(args.isVariableRate !== undefined && {
+              isVariableRate: args.isVariableRate,
+            }),
+          })) as Account | { cashAccount: Account; brokerageAccount: Account };
 
           this.writeLimiter.record(ctx.userId, "create_account");
 
+          // Investment pair: surface both account IDs so follow-up tool calls
+          // (e.g. update_account) can target either half.
+          if (
+            result &&
+            typeof result === "object" &&
+            "cashAccount" in result &&
+            "brokerageAccount" in result
+          ) {
+            return toolResult({
+              cashAccount: {
+                id: result.cashAccount.id,
+                name: result.cashAccount.name,
+                accountType: result.cashAccount.accountType,
+                currencyCode: result.cashAccount.currencyCode,
+                openingBalance: result.cashAccount.openingBalance,
+                currentBalance: result.cashAccount.currentBalance,
+              },
+              brokerageAccount: {
+                id: result.brokerageAccount.id,
+                name: result.brokerageAccount.name,
+                accountType: result.brokerageAccount.accountType,
+                currencyCode: result.brokerageAccount.currencyCode,
+                openingBalance: result.brokerageAccount.openingBalance,
+                currentBalance: result.brokerageAccount.currentBalance,
+              },
+              message:
+                "Investment account pair created: a cash account and a brokerage account, linked together.",
+            });
+          }
+
+          const account = result as Account;
           return toolResult({
             id: account.id,
             name: account.name,
