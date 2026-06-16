@@ -8,17 +8,33 @@ import { McpNetWorthTools } from "./tools/net-worth.tool";
 import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
+import { McpPlanningTools } from "./tools/planning.tool";
 
 // Tools that mutate state; everything else must be read-only.
 const WRITE_TOOLS = new Set([
   "create_transaction",
   "create_payee",
   "categorize_transaction",
+  "create_transfer",
+  "post_scheduled_transaction",
+  "update_transaction",
+  "set_transaction_status",
+  "clear_transaction",
+  "skip_scheduled_transaction",
+  "refresh_security_prices",
 ]);
 // Write tools whose repeated calls converge to the same state.
-const IDEMPOTENT_WRITES = new Set(["categorize_transaction"]);
+// (Every tool using the UPDATE annotation preset lands here; CREATE tools do not.)
+const IDEMPOTENT_WRITES = new Set([
+  "categorize_transaction",
+  "update_transaction",
+  "set_transaction_status",
+  "clear_transaction",
+  "skip_scheduled_transaction",
+  "refresh_security_prices",
+]);
 
-const EXPECTED_TOOL_COUNT = 27;
+const EXPECTED_TOOL_COUNT = 47;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;
@@ -41,11 +57,20 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
     ) as unknown as ToolProvider,
     new McpNetWorthTools({} as any, {} as any) as unknown as ToolProvider,
     new McpScheduledTools({} as any) as unknown as ToolProvider,
     new McpCalculateTools() as unknown as ToolProvider,
     new McpBudgetsTools({} as any) as unknown as ToolProvider,
+    new McpPlanningTools(
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    ) as unknown as ToolProvider,
   ];
 
   const configs: Array<{ name: string; config: any }> = [];

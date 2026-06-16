@@ -72,6 +72,6 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
     AiInsightsController,
     AiForecastController,
   ],
-  exports: [AiService, AiUsageService, AiEncryptionService],
+  exports: [AiService, AiUsageService, AiEncryptionService, AiInsightsService],
 })
 export class AiModule {}

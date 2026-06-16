@@ -11,6 +11,7 @@ import { McpNetWorthTools } from "./tools/net-worth.tool";
 import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
+import { McpPlanningTools } from "./tools/planning.tool";
 import { McpAccountListResource } from "./resources/account-list.resource";
 import { McpCategoryTreeResource } from "./resources/category-tree.resource";
 import { McpRecentTransactionsResource } from "./resources/recent-transactions.resource";
@@ -39,6 +40,7 @@ export class McpServerService {
     private readonly scheduledTools: McpScheduledTools,
     private readonly calculateTools: McpCalculateTools,
     private readonly budgetsTools: McpBudgetsTools,
+    private readonly planningTools: McpPlanningTools,
     private readonly accountListResource: McpAccountListResource,
     private readonly categoryTreeResource: McpCategoryTreeResource,
     private readonly recentTransactionsResource: McpRecentTransactionsResource,
@@ -86,6 +88,20 @@ export class McpServerService {
           "- When the user asks about trends, prefer generate_report with type monthly_trend over fetching transactions for each month.",
           "- Keep transaction searches focused: use date ranges, category/payee filters, and reasonable limits to avoid large result sets.",
           "- Use the available prompts (financial-review, budget-check, spending-analysis, transaction-lookup) as guides for multi-step workflows.",
+          "",
+          "## Investments & planning",
+          "- For allocation/diversification: get_asset_allocation (by holding) and get_sector_weightings (by sector).",
+          "- For short-term performance: get_top_movers (today's gainers/losers) and get_intraday_value (1d/1w/1m series).",
+          "- For tax planning: get_realized_gains (realized only) vs. get_capital_gains (realized + unrealized).",
+          "- For a single ticker's history: search_securities to resolve the symbol, then get_security_history.",
+          "- For projections: run_monte_carlo (feed get_monte_carlo_historical_stats into expectedReturn/volatility for realism), preview_loan_amortization / preview_mortgage_amortization, and detect_loan_payments to infer an existing loan's terms.",
+          "- For precomputed spending insights (anomalies, subscriptions, trends): get_ai_insights.",
+          "- Use refresh_security_prices when the user asks to update stale quotes.",
+          "",
+          "## Writing data",
+          "- create_transaction / create_transfer / update_transaction / set_transaction_status / clear_transaction / categorize_transaction.",
+          "- post_scheduled_transaction converts a due bill/deposit into a real transaction; skip_scheduled_transaction skips one occurrence.",
+          "- All writes require 'write' scope, are HTML-sanitized, are rate-limited (50/day per user), and support dryRun=true to preview first.",
         ].join("\n"),
         capabilities: {
           logging: {},
@@ -106,6 +122,7 @@ export class McpServerService {
     this.scheduledTools.register(server, resolve);
     this.calculateTools.register(server);
     this.budgetsTools.register(server, resolve);
+    this.planningTools.register(server, resolve);
 
     this.accountListResource.register(server, resolve);
     this.categoryTreeResource.register(server, resolve);

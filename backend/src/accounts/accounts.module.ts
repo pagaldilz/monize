@@ -50,6 +50,10 @@ import { DelegationModule } from "../delegation/delegation.module";
     MortgageReminderService,
   ],
   controllers: [AccountsController],
-  exports: [AccountsService],
+  exports: [
+    AccountsService,
+    LoanMortgageAccountService,
+    LoanPaymentDetectorService,
+  ],
 })
 export class AccountsModule {}

@@ -9,11 +9,15 @@ import {
   toolError,
   safeToolError,
 } from "../mcp-context";
+import { McpWriteLimiter } from "../mcp-write-limiter";
+import { stripHtml } from "../../common/sanitization.util";
 import {
   getUpcomingBillsOutput,
   getScheduledTransactionsOutput,
+  postScheduledTransactionOutput,
+  skipScheduledTransactionOutput,
 } from "../tool-output-schemas";
-import { READ_ONLY } from "../mcp-annotations";
+import { READ_ONLY, CREATE, UPDATE } from "../mcp-annotations";
 
 const SCHEDULED_KIND_VALUES = [
   "bill",
@@ -25,6 +29,8 @@ const SCHEDULED_KIND_VALUES = [
 
 @Injectable()
 export class McpScheduledTools {
+  private readonly writeLimiter = new McpWriteLimiter();
+
   constructor(
     private readonly scheduledService: ScheduledTransactionsService,
   ) {}
@@ -126,6 +132,156 @@ export class McpScheduledTools {
             },
           );
           return toolResult(scheduled);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "post_scheduled_transaction",
+      {
+        title: "Post scheduled transaction",
+        annotations: CREATE,
+        description:
+          "Post a due scheduled bill/deposit into a real transaction on its next due date, then advance the schedule to the following occurrence. Optionally override the date, amount, category, or description for this posting. Set dryRun=true to preview what would be posted without creating the transaction.",
+        inputSchema: {
+          id: z.string().uuid().describe("Scheduled transaction ID to post"),
+          transactionDate: z
+            .string()
+            .max(10)
+            .optional()
+            .describe(
+              "Posting date (YYYY-MM-DD). Defaults to the next due date.",
+            ),
+          amount: z
+            .number()
+            .min(-999999999999)
+            .max(999999999999)
+            .optional()
+            .describe("Override the posted amount"),
+          categoryId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe("Override the category for this posting"),
+          description: z
+            .string()
+            .max(500)
+            .optional()
+            .describe("Override the description/memo for this posting"),
+          referenceNumber: z
+            .string()
+            .max(100)
+            .optional()
+            .describe("Reference number for the posted transaction"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              "If true, return a preview without posting the transaction",
+            ),
+        },
+        outputSchema: postScheduledTransactionOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const existing = await this.scheduledService.findOne(ctx.userId, args.id);
+
+          // Dry-run mode: preview without persisting
+          if (args.dryRun) {
+            return toolResult({
+              dryRun: true,
+              preview: {
+                scheduledTransactionId: args.id,
+                name: existing.name,
+                transactionDate: args.transactionDate ?? existing.nextDueDate ?? null,
+                amount: args.amount ?? existing.amount ?? null,
+                categoryId: args.categoryId ?? existing.categoryId ?? null,
+                description:
+                  stripHtml(args.description) || existing.description || null,
+              },
+              message:
+                "This is a preview. Call again with dryRun=false to post the transaction.",
+            });
+          }
+
+          const updated = await this.scheduledService.post(ctx.userId, args.id, {
+            transactionDate: args.transactionDate,
+            amount: args.amount,
+            categoryId: args.categoryId,
+            description: stripHtml(args.description),
+            referenceNumber: stripHtml(args.referenceNumber),
+          });
+
+          this.writeLimiter.record(ctx.userId, "post_scheduled_transaction");
+
+          return toolResult({
+            posted: true,
+            scheduledTransactionId: args.id,
+            nextDueDate: updated?.nextDueDate ?? null,
+            message:
+              "Scheduled transaction posted. The schedule advanced to the next due date.",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "skip_scheduled_transaction",
+      {
+        title: "Skip scheduled occurrence",
+        annotations: UPDATE,
+        description:
+          "Skip the next occurrence of a scheduled bill/deposit and advance the schedule to the following due date. Useful when a recurring transaction does not apply this period.",
+        inputSchema: {
+          id: z
+            .string()
+            .uuid()
+            .describe("Scheduled transaction ID to skip"),
+        },
+        outputSchema: skipScheduledTransactionOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const updated = await this.scheduledService.skip(ctx.userId, args.id);
+
+          this.writeLimiter.record(ctx.userId, "skip_scheduled_transaction");
+
+          return toolResult({
+            id: updated.id,
+            nextDueDate: updated.nextDueDate ?? null,
+            message: "Scheduled occurrence skipped; schedule advanced.",
+          });
         } catch (err: unknown) {
           return safeToolError(err);
         }

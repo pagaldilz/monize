@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
 import { AccountsService } from "../../accounts/accounts.service";
+import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import {
   UserContextResolver,
   requireScope,
@@ -27,6 +28,10 @@ import {
   getTransfersOutput,
   createTransactionOutput,
   categorizeTransactionOutput,
+  updateTransactionOutput,
+  createTransferOutput,
+  setTransactionStatusOutput,
+  clearTransactionOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY, CREATE, UPDATE } from "../mcp-annotations";
 
@@ -555,6 +560,382 @@ export class McpTransactionsTools {
             id: transaction.id,
             categoryId: transaction.categoryId,
             message: "Transaction categorized successfully",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "update_transaction",
+      {
+        title: "Update transaction",
+        annotations: UPDATE,
+        description:
+          "Update an existing transaction's fields (amount, date, payee, category, description, status, account). Only the fields you provide are changed. Set dryRun=true to preview the change without saving.",
+        inputSchema: {
+          id: z.string().uuid().describe("Transaction ID to update"),
+          accountId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe("Move the transaction to this account"),
+          amount: z
+            .number()
+            .min(-999999999999)
+            .max(999999999999)
+            .optional()
+            .describe("Amount (positive for income, negative for expenses)"),
+          date: z
+            .string()
+            .max(10)
+            .optional()
+            .describe("Transaction date (YYYY-MM-DD)"),
+          payeeName: z.string().max(100).optional().describe("Payee name"),
+          categoryId: z.string().uuid().optional().describe("Category ID"),
+          description: z
+            .string()
+            .max(500)
+            .optional()
+            .describe("Description or memo"),
+          status: z
+            .nativeEnum(TransactionStatus)
+            .optional()
+            .describe(
+              "Transaction status: UNRECONCILED, CLEARED, RECONCILED, or VOID",
+            ),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              "If true, validate and return a preview without updating the transaction",
+            ),
+        },
+        outputSchema: updateTransactionOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const existing = await this.transactionsService.findOne(
+            ctx.userId,
+            args.id,
+          );
+
+          // Dry-run mode: return a preview of what would change without persisting
+          if (args.dryRun) {
+            return toolResult({
+              dryRun: true,
+              preview: {
+                id: args.id,
+                accountId: args.accountId ?? existing.accountId ?? null,
+                accountName: existing.account?.name ?? null,
+                amount: args.amount ?? existing.amount ?? null,
+                date: args.date ?? existing.transactionDate ?? null,
+                payeeName: stripHtml(args.payeeName) || existing.payeeName || null,
+                categoryId: args.categoryId ?? existing.categoryId ?? null,
+                description:
+                  stripHtml(args.description) || existing.description || null,
+                status: args.status ?? existing.status ?? null,
+              },
+              message:
+                "This is a preview. Call again with dryRun=false to apply the update.",
+            });
+          }
+
+          // LLM07-F3: Sanitize user-controlled strings before persisting.
+          const dto: Record<string, unknown> = {};
+          if (args.accountId !== undefined) dto.accountId = args.accountId;
+          if (args.amount !== undefined) dto.amount = args.amount;
+          if (args.date !== undefined) dto.transactionDate = args.date;
+          if (args.payeeName !== undefined)
+            dto.payeeName = stripHtml(args.payeeName);
+          if (args.categoryId !== undefined) dto.categoryId = args.categoryId;
+          if (args.description !== undefined)
+            dto.description = stripHtml(args.description);
+          if (args.status !== undefined) dto.status = args.status;
+
+          const transaction = await this.transactionsService.update(
+            ctx.userId,
+            args.id,
+            dto as any,
+          );
+
+          this.writeLimiter.record(ctx.userId, "update_transaction");
+
+          return toolResult({
+            id: transaction.id,
+            date: transaction.transactionDate,
+            amount: transaction.amount,
+            payeeName: transaction.payeeName,
+            categoryId: transaction.categoryId,
+            status: transaction.status,
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "create_transfer",
+      {
+        title: "Create transfer",
+        annotations: CREATE,
+        description:
+          "Create a transfer between two of the user's own accounts (e.g. checking to savings, or paying a credit card). For multi-currency transfers, optionally provide an exchangeRate or toAmount. Set dryRun=true to preview without saving.",
+        inputSchema: {
+          fromAccountId: z
+            .string()
+            .uuid()
+            .describe("Account the money leaves"),
+          toAccountId: z.string().uuid().describe("Account the money enters"),
+          amount: z
+            .number()
+            .min(0)
+            .max(999999999999)
+            .describe(
+              "Amount to transfer in the source account's currency (positive)",
+            ),
+          date: z.string().max(10).describe("Transfer date (YYYY-MM-DD)"),
+          fromCurrencyCode: z
+            .string()
+            .describe("Source account currency code (e.g. USD)"),
+          toCurrencyCode: z
+            .string()
+            .optional()
+            .describe(
+              "Destination account currency code. Defaults to the source currency.",
+            ),
+          exchangeRate: z
+            .number()
+            .min(0)
+            .max(1000000)
+            .optional()
+            .describe(
+              "Optional exchange rate (source -> destination). Ignored if toAmount is provided.",
+            ),
+          toAmount: z
+            .number()
+            .min(0)
+            .max(999999999999)
+            .optional()
+            .describe(
+              "Optional explicit amount in the destination currency (overrides exchangeRate).",
+            ),
+          payeeName: z.string().max(100).optional().describe("Payee name"),
+          description: z
+            .string()
+            .max(500)
+            .optional()
+            .describe("Description or memo"),
+          status: z
+            .nativeEnum(TransactionStatus)
+            .optional()
+            .describe("Transaction status (default UNRECONCILED)"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              "If true, validate and return a preview without creating the transfer",
+            ),
+        },
+        outputSchema: createTransferOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const [fromAccount, toAccount] = await Promise.all([
+            this.accountsService.findOne(ctx.userId, args.fromAccountId),
+            this.accountsService.findOne(ctx.userId, args.toAccountId),
+          ]);
+
+          // Dry-run mode: return preview without persisting
+          if (args.dryRun) {
+            return toolResult({
+              dryRun: true,
+              preview: {
+                fromAccountId: args.fromAccountId,
+                fromAccountName: fromAccount.name,
+                toAccountId: args.toAccountId,
+                toAccountName: toAccount.name,
+                amount: args.amount,
+                date: args.date,
+                fromCurrencyCode: args.fromCurrencyCode,
+                toCurrencyCode: args.toCurrencyCode ?? args.fromCurrencyCode,
+                exchangeRate: args.exchangeRate ?? null,
+                toAmount: args.toAmount ?? null,
+                payeeName: stripHtml(args.payeeName) || null,
+                description: stripHtml(args.description) || null,
+                status: args.status ?? "UNRECONCILED",
+              },
+              message:
+                "This is a preview. Call again with dryRun=false to create the transfer.",
+            });
+          }
+
+          // LLM07-F3: Sanitize user-controlled strings before persisting.
+          const result = await this.transactionsService.createTransfer(
+            ctx.userId,
+            {
+              fromAccountId: args.fromAccountId,
+              toAccountId: args.toAccountId,
+              amount: args.amount,
+              transactionDate: args.date,
+              fromCurrencyCode: args.fromCurrencyCode,
+              toCurrencyCode: args.toCurrencyCode ?? args.fromCurrencyCode,
+              exchangeRate: args.exchangeRate,
+              toAmount: args.toAmount,
+              payeeName: stripHtml(args.payeeName),
+              description: stripHtml(args.description),
+              status: args.status,
+            },
+          );
+
+          this.writeLimiter.record(ctx.userId, "create_transfer");
+
+          return toolResult({
+            fromTransaction: {
+              id: result.fromTransaction.id,
+              date: result.fromTransaction.transactionDate,
+              amount: result.fromTransaction.amount,
+              status: result.fromTransaction.status,
+            },
+            toTransaction: {
+              id: result.toTransaction.id,
+              date: result.toTransaction.transactionDate,
+              amount: result.toTransaction.amount,
+              status: result.toTransaction.status,
+            },
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "set_transaction_status",
+      {
+        title: "Set transaction status",
+        annotations: UPDATE,
+        description:
+          "Set a transaction's reconciliation status: UNRECONCILED, CLEARED, RECONCILED, or VOID. Use this to mark transactions cleared or reconciled against a statement.",
+        inputSchema: {
+          id: z.string().uuid().describe("Transaction ID"),
+          status: z
+            .nativeEnum(TransactionStatus)
+            .describe(
+              "New status: UNRECONCILED, CLEARED, RECONCILED, or VOID",
+            ),
+        },
+        outputSchema: setTransactionStatusOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const transaction = await this.transactionsService.updateStatus(
+            ctx.userId,
+            args.id,
+            args.status,
+          );
+
+          this.writeLimiter.record(ctx.userId, "set_transaction_status");
+
+          return toolResult({
+            id: transaction.id,
+            status: transaction.status,
+            message: `Transaction status set to ${transaction.status}`,
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "clear_transaction",
+      {
+        title: "Clear transaction",
+        annotations: UPDATE,
+        description:
+          "Mark a transaction as cleared (isCleared=true) or uncleared (isCleared=false) against the bank statement. A convenience wrapper around set_transaction_status for the common clear/unclear action.",
+        inputSchema: {
+          id: z.string().uuid().describe("Transaction ID"),
+          isCleared: z
+            .boolean()
+            .describe("true to mark cleared, false to mark uncleared"),
+        },
+        outputSchema: clearTransactionOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const transaction = await this.transactionsService.markCleared(
+            ctx.userId,
+            args.id,
+            args.isCleared,
+          );
+
+          this.writeLimiter.record(ctx.userId, "clear_transaction");
+
+          return toolResult({
+            id: transaction.id,
+            status: transaction.status,
+            isCleared: args.isCleared,
+            message: args.isCleared
+              ? "Transaction marked cleared"
+              : "Transaction marked uncleared",
           });
         } catch (err: unknown) {
           return safeToolError(err);

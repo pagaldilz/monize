@@ -12,6 +12,9 @@ describe("McpScheduledTools", () => {
     scheduledService = {
       getLlmUpcomingBillsAndDeposits: jest.fn(),
       getLlmScheduledList: jest.fn(),
+      findOne: jest.fn(),
+      post: jest.fn(),
+      skip: jest.fn(),
     };
 
     tool = new McpScheduledTools(scheduledService as any);
@@ -26,8 +29,8 @@ describe("McpScheduledTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 2 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(2);
+  it("should register 4 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(4);
   });
 
   describe("get_upcoming_bills", () => {

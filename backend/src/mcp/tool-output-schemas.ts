@@ -220,6 +220,85 @@ export const categorizeTransactionOutput = {
   message: str,
 };
 
+export const updateTransactionOutput = {
+  // Dry-run preview branch.
+  dryRun: bool.optional(),
+  preview: z
+    .object({
+      id: str.optional(),
+      accountId: str.optional(),
+      accountName: str.optional(),
+      amount: num.optional(),
+      date: str.optional(),
+      payeeName: strNull.optional(),
+      categoryId: strNull.optional(),
+      description: strNull.optional(),
+      status: str.optional(),
+    })
+    .optional(),
+  message: str.optional(),
+  // Updated-transaction branch.
+  id: str.optional(),
+  date: str.optional(),
+  amount: num.optional(),
+  payeeName: strNull.optional(),
+  categoryId: strNull.optional(),
+  status: str.optional(),
+};
+
+export const createTransferOutput = {
+  // Dry-run preview branch.
+  dryRun: bool.optional(),
+  preview: z
+    .object({
+      fromAccountId: str.optional(),
+      fromAccountName: str.optional(),
+      toAccountId: str.optional(),
+      toAccountName: str.optional(),
+      amount: num.optional(),
+      date: str.optional(),
+      fromCurrencyCode: str.optional(),
+      toCurrencyCode: str.optional(),
+      exchangeRate: numNull.optional(),
+      toAmount: numNull.optional(),
+      payeeName: strNull.optional(),
+      description: strNull.optional(),
+      status: str.optional(),
+    })
+    .optional(),
+  message: str.optional(),
+  // Created-transfer branch.
+  fromTransaction: z
+    .object({
+      id: str.optional(),
+      date: str.optional(),
+      amount: num.optional(),
+      status: str.optional(),
+    })
+    .optional(),
+  toTransaction: z
+    .object({
+      id: str.optional(),
+      date: str.optional(),
+      amount: num.optional(),
+      status: str.optional(),
+    })
+    .optional(),
+};
+
+export const setTransactionStatusOutput = {
+  id: str,
+  status: str,
+  message: str,
+};
+
+export const clearTransactionOutput = {
+  id: str,
+  status: str,
+  isCleared: bool,
+  message: str,
+};
+
 // ---------------------------------------------------------------------------
 // categories.tool.ts
 // ---------------------------------------------------------------------------
@@ -424,6 +503,254 @@ export const getHoldingDetailsOutput = {
   ),
 };
 
+export const getAssetAllocationOutput = {
+  totalValue: num,
+  allocation: z.array(
+    z.object({
+      name: str,
+      symbol: strNull,
+      type: str,
+      value: num,
+      percentage: num,
+    }),
+  ),
+};
+
+export const getTopMoversOutput = {
+  items: z.array(
+    z.object({
+      securityId: str,
+      symbol: str,
+      name: str,
+      currencyCode: str,
+      currentPrice: num,
+      previousPrice: num,
+      dailyChange: num,
+      dailyChangePercent: num,
+      marketValue: numNull,
+    }),
+  ),
+};
+
+export const getSectorWeightingsOutput = {
+  totalPortfolioValue: num,
+  totalDirectValue: num,
+  totalEtfValue: num,
+  unclassifiedValue: num,
+  items: z.array(
+    z.object({
+      sector: str,
+      directValue: num,
+      etfValue: num,
+      totalValue: num,
+      percentage: num,
+    }),
+  ),
+};
+
+export const getIntradayValueOutput = {
+  interval: str,
+  currency: str,
+  range: str,
+  fetchedAt: str,
+  skippedSymbols: z.array(str),
+  failedSymbols: z.array(str),
+  fallbackToDaily: bool,
+  points: z.array(
+    z.object({
+      timestamp: str,
+      value: num,
+    }),
+  ),
+};
+
+export const getRealizedGainsOutput = {
+  items: z.array(z.unknown()),
+};
+
+export const getSecurityHistoryOutput = {
+  securityId: str,
+  symbol: str,
+  name: str,
+  currencyCode: str,
+  isActive: bool,
+  currentQuantityAll: num,
+  accounts: z.array(
+    z.object({
+      accountId: str,
+      accountName: str,
+      isClosed: bool,
+      currentQuantity: num,
+    }),
+  ),
+  transactions: z.array(
+    z.object({
+      id: str,
+      transactionDate: str,
+      accountId: str,
+      accountName: str,
+      action: str,
+      quantity: numNull,
+      price: numNull,
+      commission: num,
+      totalAmount: num,
+      description: strNull,
+      runningQuantityAccount: num,
+      runningQuantityAll: num,
+    }),
+  ),
+};
+
+export const searchSecuritiesOutput = {
+  items: z.array(
+    z.object({
+      id: str.optional(),
+      symbol: str,
+      name: strNull,
+      securityType: strNull.optional(),
+      currencyCode: strNull.optional(),
+      exchange: strNull.optional(),
+      sector: strNull.optional(),
+      isActive: bool.optional(),
+    }),
+  ),
+};
+
+export const refreshSecurityPricesOutput = {
+  totalSecurities: num,
+  updated: num,
+  failed: num,
+  skipped: num,
+  lastUpdated: str,
+  results: z.array(
+    z.object({
+      symbol: str,
+      success: bool,
+      price: numNull.optional(),
+      error: strNull.optional(),
+    }),
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// planning.tool.ts
+// ---------------------------------------------------------------------------
+
+const percentileBand = z.object({
+  p10: num,
+  p25: num,
+  p50: num,
+  p75: num,
+  p90: num,
+});
+
+export const runMonteCarloOutput = {
+  yearLabels: z.array(str),
+  percentiles: z.object({
+    p10: z.array(num),
+    p25: z.array(num),
+    p50: z.array(num),
+    p75: z.array(num),
+    p90: z.array(num),
+  }),
+  finalDistribution: z.object({
+    min: num,
+    max: num,
+    mean: num,
+    median: num,
+    stdev: num,
+    depletionRate: num,
+  }),
+  performanceSummary: z.object({
+    twrNominal: percentileBand,
+    twrReal: percentileBand,
+    endBalanceNominal: percentileBand,
+    endBalanceReal: percentileBand,
+    meanReturnNominal: percentileBand,
+    annualizedVolatility: percentileBand,
+    maxDrawdown: percentileBand,
+    maxDrawdownExcludingCashflows: percentileBand,
+    safeWithdrawalRate: percentileBand,
+    perpetualWithdrawalRate: percentileBand,
+  }),
+  successRate: numNull,
+  inputsSnapshot: z.record(z.string(), z.unknown()),
+  realValues: bool,
+  ranAt: str,
+};
+
+export const getMonteCarloHistoricalStatsOutput = {
+  yearsObserved: num,
+  meanReturn: numNull,
+  volatility: numNull,
+  currentBalance: num,
+};
+
+export const previewLoanAmortizationOutput = {
+  paymentAmount: num.optional(),
+  principalPayment: num.optional(),
+  interestPayment: num.optional(),
+  remainingBalance: num.optional(),
+  totalPayments: num.optional(),
+  endDate: strNull.optional(),
+  schedule: z
+    .array(
+      z.object({
+        paymentNumber: num.optional(),
+        date: strNull.optional(),
+        payment: num.optional(),
+        principal: num.optional(),
+        interest: num.optional(),
+        balance: num.optional(),
+      }),
+    )
+    .optional(),
+};
+
+export const previewMortgageAmortizationOutput = previewLoanAmortizationOutput;
+
+export const detectLoanPaymentsOutput = {
+  paymentAmount: numNull.optional(),
+  paymentFrequency: strNull.optional(),
+  confidence: numNull.optional(),
+  sourceAccountId: strNull.optional(),
+  sourceAccountName: strNull.optional(),
+  interestCategoryId: strNull.optional(),
+  interestCategoryName: strNull.optional(),
+  principalCategoryId: strNull.optional(),
+  estimatedInterestRate: numNull.optional(),
+  suggestedNextDueDate: strNull.optional(),
+  firstPaymentDate: strNull.optional(),
+  lastPaymentDate: strNull.optional(),
+  paymentCount: numNull.optional(),
+  currentBalance: numNull.optional(),
+  isMortgage: bool.optional(),
+  averageExtraPrincipal: numNull.optional(),
+  extraPrincipalCount: numNull.optional(),
+  lastPrincipalAmount: numNull.optional(),
+  lastInterestAmount: numNull.optional(),
+};
+
+export const getAiInsightsOutput = {
+  insights: z.array(
+    z.object({
+      id: str,
+      type: str,
+      title: str,
+      description: str,
+      severity: str,
+      data: z.record(z.string(), z.unknown()).optional(),
+      isDismissed: bool,
+      generatedAt: str,
+      expiresAt: str,
+      createdAt: str,
+    }),
+  ),
+  total: num,
+  lastGeneratedAt: strNull,
+  isGenerating: bool,
+};
+
 // ---------------------------------------------------------------------------
 // scheduled.tool.ts
 // ---------------------------------------------------------------------------
@@ -462,6 +789,33 @@ export const getScheduledTransactionsOutput = {
   billCount: num,
   depositCount: num,
   items: z.array(scheduledItem),
+};
+
+export const postScheduledTransactionOutput = {
+  // Dry-run preview branch.
+  dryRun: bool.optional(),
+  preview: z
+    .object({
+      scheduledTransactionId: str.optional(),
+      name: str.optional(),
+      transactionDate: str.optional(),
+      amount: num.optional(),
+      categoryId: strNull.optional(),
+      description: strNull.optional(),
+    })
+    .optional(),
+  message: str.optional(),
+  // Posted branch: the service returns the scheduled transaction (updated with
+  // the new next-due date) or null. We model both shapes tolerantly.
+  posted: bool.optional(),
+  scheduledTransactionId: strNull.optional(),
+  nextDueDate: strNull.optional(),
+};
+
+export const skipScheduledTransactionOutput = {
+  id: str,
+  nextDueDate: strNull,
+  message: str,
 };
 
 // ---------------------------------------------------------------------------

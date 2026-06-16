@@ -6,6 +6,9 @@ describe("McpInvestmentsTools", () => {
   let portfolioService: Record<string, jest.Mock>;
   let holdingsService: Record<string, jest.Mock>;
   let investmentTransactionsService: Record<string, jest.Mock>;
+  let securitiesService: Record<string, jest.Mock>;
+  let securityPriceService: Record<string, jest.Mock>;
+  let sectorWeightingService: Record<string, jest.Mock>;
   let server: { registerTool: jest.Mock };
   let resolve: jest.MockedFunction<UserContextResolver>;
   const handlers: Record<string, (...args: any[]) => any> = {};
@@ -14,6 +17,9 @@ describe("McpInvestmentsTools", () => {
     portfolioService = {
       getPortfolioSummary: jest.fn(),
       getLlmSummary: jest.fn(),
+      getAssetAllocation: jest.fn(),
+      getTopMovers: jest.fn(),
+      getIntradayValueSeries: jest.fn(),
     };
 
     holdingsService = {
@@ -23,12 +29,30 @@ describe("McpInvestmentsTools", () => {
     investmentTransactionsService = {
       getLlmInvestmentTransactions: jest.fn(),
       getLlmCapitalGains: jest.fn(),
+      getRealizedGains: jest.fn(),
+      getSecurityTransactionHistory: jest.fn(),
+    };
+
+    securitiesService = {
+      search: jest.fn(),
+      findOne: jest.fn(),
+    };
+
+    securityPriceService = {
+      refreshPricesForSecurities: jest.fn(),
+    };
+
+    sectorWeightingService = {
+      getSectorWeightings: jest.fn(),
     };
 
     tool = new McpInvestmentsTools(
       portfolioService as any,
       holdingsService as any,
       investmentTransactionsService as any,
+      securitiesService as any,
+      securityPriceService as any,
+      sectorWeightingService as any,
     );
 
     server = {
@@ -41,8 +65,8 @@ describe("McpInvestmentsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 4 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(4);
+  it("should register 12 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(12);
   });
 
   describe("get_portfolio_summary", () => {

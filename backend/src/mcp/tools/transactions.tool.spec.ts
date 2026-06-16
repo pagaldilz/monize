@@ -14,9 +14,13 @@ describe("McpTransactionsTools", () => {
   beforeEach(() => {
     transactionsService = {
       findAll: jest.fn(),
+      findOne: jest.fn(),
       getLlmTransactionRows: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      createTransfer: jest.fn(),
+      updateStatus: jest.fn(),
+      markCleared: jest.fn(),
     };
 
     analyticsService = {
@@ -47,8 +51,8 @@ describe("McpTransactionsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 8 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(8);
+  it("should register 12 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(12);
   });
 
   describe("query_transactions", () => {
@@ -626,6 +630,173 @@ describe("McpTransactionsTools", () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Daily write limit reached");
+    });
+  });
+
+  describe("update_transaction", () => {
+    it("should require write scope", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+      const result = await handlers["update_transaction"](
+        { id: "t1", amount: -50 },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+    });
+
+    it("returns a preview in dry-run mode without persisting", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      transactionsService.findOne.mockResolvedValue({
+        id: "t1",
+        amount: -40,
+        transactionDate: "2025-01-15",
+        payeeName: "Old",
+        description: "prev",
+        status: "UNRECONCILED",
+        account: { name: "Checking" },
+      });
+
+      const result = await handlers["update_transaction"](
+        { id: "t1", amount: -50, payeeName: "<b>New</b>", dryRun: true },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.update).not.toHaveBeenCalled();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.preview.amount).toBe(-50);
+      expect(parsed.preview.payeeName).toBe("bNew/b"); // HTML stripped
+    });
+
+    it("applies only provided fields and strips HTML", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      transactionsService.update.mockResolvedValue({
+        id: "t1",
+        transactionDate: "2025-01-15",
+        amount: -50,
+        payeeName: "New",
+        categoryId: "c1",
+        status: "UNRECONCILED",
+      });
+
+      await handlers["update_transaction"](
+        { id: "t1", amount: -50, payeeName: "<script>x</script>" },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.update).toHaveBeenCalledWith(
+        "u1",
+        "t1",
+        expect.objectContaining({
+          amount: -50,
+          payeeName: "scriptx/script",
+        }),
+      );
+    });
+  });
+
+  describe("create_transfer", () => {
+    it("returns a preview in dry-run mode", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      accountsService.findOne
+        .mockResolvedValueOnce({ name: "Checking", currencyCode: "USD" })
+        .mockResolvedValueOnce({ name: "Savings", currencyCode: "USD" });
+
+      const result = await handlers["create_transfer"](
+        {
+          fromAccountId: "a1",
+          toAccountId: "a2",
+          amount: 100,
+          date: "2025-01-15",
+          fromCurrencyCode: "USD",
+          dryRun: true,
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.createTransfer).not.toHaveBeenCalled();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.preview.fromAccountName).toBe("Checking");
+      expect(parsed.preview.toAccountName).toBe("Savings");
+    });
+
+    it("creates the transfer and records both sides", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      accountsService.findOne
+        .mockResolvedValueOnce({ name: "Checking", currencyCode: "USD" })
+        .mockResolvedValueOnce({ name: "Savings", currencyCode: "USD" });
+      transactionsService.createTransfer.mockResolvedValue({
+        fromTransaction: {
+          id: "t1",
+          transactionDate: "2025-01-15",
+          amount: -100,
+          status: "UNRECONCILED",
+        },
+        toTransaction: {
+          id: "t2",
+          transactionDate: "2025-01-15",
+          amount: 100,
+          status: "UNRECONCILED",
+        },
+      });
+
+      const result = await handlers["create_transfer"](
+        {
+          fromAccountId: "a1",
+          toAccountId: "a2",
+          amount: 100,
+          date: "2025-01-15",
+          fromCurrencyCode: "USD",
+        },
+        { sessionId: "s1" },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.fromTransaction.id).toBe("t1");
+      expect(parsed.toTransaction.id).toBe("t2");
+    });
+  });
+
+  describe("set_transaction_status", () => {
+    it("delegates to transactionsService.updateStatus", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      transactionsService.updateStatus.mockResolvedValue({
+        id: "t1",
+        status: "CLEARED",
+      });
+
+      const result = await handlers["set_transaction_status"](
+        { id: "t1", status: "CLEARED" },
+        { sessionId: "s1" },
+      );
+      expect(transactionsService.updateStatus).toHaveBeenCalledWith(
+        "u1",
+        "t1",
+        "CLEARED",
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.status).toBe("CLEARED");
+    });
+  });
+
+  describe("clear_transaction", () => {
+    it("delegates to transactionsService.markCleared", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      transactionsService.markCleared.mockResolvedValue({
+        id: "t1",
+        status: "CLEARED",
+      });
+
+      const result = await handlers["clear_transaction"](
+        { id: "t1", isCleared: true },
+        { sessionId: "s1" },
+      );
+      expect(transactionsService.markCleared).toHaveBeenCalledWith(
+        "u1",
+        "t1",
+        true,
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.isCleared).toBe(true);
     });
   });
 });

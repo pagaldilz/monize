@@ -3,6 +3,9 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { HoldingsService } from "../../securities/holdings.service";
+import { SecuritiesService } from "../../securities/securities.service";
+import { SecurityPriceService } from "../../securities/security-price.service";
+import { SectorWeightingService } from "../../securities/sector-weighting.service";
 import {
   InvestmentTransactionsService,
   LlmCapitalGainsGroupBy,
@@ -16,20 +19,36 @@ import {
   toolError,
   safeToolError,
 } from "../mcp-context";
+import { McpWriteLimiter } from "../mcp-write-limiter";
 import {
   getPortfolioSummaryOutput,
   queryInvestmentTransactionsOutput,
   getCapitalGainsOutput,
   getHoldingDetailsOutput,
+  getAssetAllocationOutput,
+  getTopMoversOutput,
+  getSectorWeightingsOutput,
+  getIntradayValueOutput,
+  getRealizedGainsOutput,
+  getSecurityHistoryOutput,
+  searchSecuritiesOutput,
+  refreshSecurityPricesOutput,
 } from "../tool-output-schemas";
-import { READ_ONLY } from "../mcp-annotations";
+import { READ_ONLY, UPDATE } from "../mcp-annotations";
+
+const INTRADAY_RANGES = ["1d", "1w", "1m"] as const;
 
 @Injectable()
 export class McpInvestmentsTools {
+  private readonly writeLimiter = new McpWriteLimiter();
+
   constructor(
     private readonly portfolioService: PortfolioService,
     private readonly holdingsService: HoldingsService,
     private readonly investmentTransactionsService: InvestmentTransactionsService,
+    private readonly securitiesService: SecuritiesService,
+    private readonly securityPriceService: SecurityPriceService,
+    private readonly sectorWeightingService: SectorWeightingService,
   ) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -230,6 +249,329 @@ export class McpInvestmentsTools {
             args.accountId,
           );
           return toolResult(holdings);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_asset_allocation",
+      {
+        title: "Asset allocation",
+        annotations: READ_ONLY,
+        description:
+          "Current portfolio allocation broken down by holding (cash vs. each security), with value and percentage of total. Useful for diversification and rebalancing questions.",
+        inputSchema: {
+          accountIds: z
+            .array(z.string().uuid())
+            .max(50)
+            .optional()
+            .describe(
+              "Optional investment account IDs to filter to. Omit to cover all investment accounts.",
+            ),
+        },
+        outputSchema: getAssetAllocationOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data = await this.portfolioService.getAssetAllocation(
+            ctx.userId,
+            args.accountIds,
+          );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_top_movers",
+      {
+        title: "Top movers",
+        annotations: READ_ONLY,
+        description:
+          "Today's biggest daily gainers and losers across the user's held securities, with daily change in value and percent.",
+        inputSchema: {},
+        outputSchema: getTopMoversOutput,
+      },
+      async (_args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data = await this.portfolioService.getTopMovers(ctx.userId);
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_sector_weightings",
+      {
+        title: "Sector weightings",
+        annotations: READ_ONLY,
+        description:
+          "Portfolio exposure broken down by economic sector. Combines direct stock sectors with ETF-derived sector exposure, plus an unclassified bucket. Useful for diversification analysis.",
+        inputSchema: {
+          accountIds: z
+            .array(z.string().uuid())
+            .max(50)
+            .optional()
+            .describe(
+              "Optional investment account IDs to filter to. Omit to cover all investment accounts.",
+            ),
+          securityIds: z
+            .array(z.string().uuid())
+            .max(100)
+            .optional()
+            .describe(
+              "Optional security IDs to scope the sector breakdown.",
+            ),
+        },
+        outputSchema: getSectorWeightingsOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data = await this.sectorWeightingService.getSectorWeightings(
+            ctx.userId,
+            args.accountIds,
+            args.securityIds,
+          );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_intraday_value",
+      {
+        title: "Intraday portfolio value",
+        annotations: READ_ONLY,
+        description:
+          "Portfolio value time series at fine granularity: 1 day (minute intervals), 1 week, or 1 month. Falls back to daily closes when intraday quotes are unavailable. Useful for short-term performance questions.",
+        inputSchema: {
+          range: z
+            .enum(INTRADAY_RANGES)
+            .optional()
+            .default("1d")
+            .describe("Time window: '1d', '1w', or '1m' (default '1d')"),
+          accountIds: z
+            .array(z.string().uuid())
+            .max(50)
+            .optional()
+            .describe(
+              "Optional investment account IDs to filter to.",
+            ),
+          displayCurrency: z
+            .string()
+            .max(10)
+            .optional()
+            .describe(
+              "Optional currency code to convert all values into.",
+            ),
+        },
+        outputSchema: getIntradayValueOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data = await this.portfolioService.getIntradayValueSeries(
+            ctx.userId,
+            {
+              range: args.range,
+              accountIds: args.accountIds,
+              displayCurrency: args.displayCurrency,
+            },
+          );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_realized_gains",
+      {
+        title: "Realized gains",
+        annotations: READ_ONLY,
+        description:
+          "Per-SELL realized gains using average-cost basis, optionally filtered by account and date range. Use this (rather than get_capital_gains) when you only need realized, tax-relevant gains from sales.",
+        inputSchema: {
+          startDate: z
+            .string()
+            .max(10)
+            .optional()
+            .describe("Optional start date (YYYY-MM-DD)"),
+          endDate: z
+            .string()
+            .max(10)
+            .optional()
+            .describe("Optional end date (YYYY-MM-DD)"),
+          accountIds: z
+            .array(z.string().uuid())
+            .max(50)
+            .optional()
+            .describe("Optional investment account IDs."),
+        },
+        outputSchema: getRealizedGainsOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data =
+            await this.investmentTransactionsService.getRealizedGains(
+              ctx.userId,
+              {
+                accountIds: args.accountIds,
+                startDate: args.startDate,
+                endDate: args.endDate,
+              },
+            );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "get_security_history",
+      {
+        title: "Security transaction history",
+        annotations: READ_ONLY,
+        description:
+          "Full transaction history for a single security across all of the user's accounts, with per-account and cumulative running share totals. Use this when the user asks about a specific ticker's buy/sell/dividend activity over time.",
+        inputSchema: {
+          securityId: z.string().uuid().describe("Security ID"),
+        },
+        outputSchema: getSecurityHistoryOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data =
+            await this.investmentTransactionsService.getSecurityTransactionHistory(
+              ctx.userId,
+              args.securityId,
+            );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "search_securities",
+      {
+        title: "Search securities",
+        annotations: READ_ONLY,
+        description:
+          "Search the user's own securities catalog by symbol or name. Returns matching securities with their IDs, types, and currencies. Use this to resolve a ticker symbol to a securityId before calling get_security_history or refresh_security_prices.",
+        inputSchema: {
+          query: z
+            .string()
+            .min(1)
+            .max(200)
+            .describe("Symbol or name fragment to search for"),
+        },
+        outputSchema: searchSecuritiesOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "read");
+        if (check.error) return check.result;
+
+        try {
+          const data = await this.securitiesService.search(
+            ctx.userId,
+            args.query.slice(0, 200),
+          );
+          return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "refresh_security_prices",
+      {
+        title: "Refresh security prices",
+        annotations: UPDATE,
+        description:
+          "Fetch the latest prices for a set of the user's securities from the quote provider (Yahoo/MSN). Use this when prices look stale or the user asks to update quotes. Best-effort: per-security failures are reported but do not fail the whole call.",
+        inputSchema: {
+          securityIds: z
+            .array(z.string().uuid())
+            .min(1)
+            .max(100)
+            .describe(
+              "Security IDs (max 100). All must belong to the calling user.",
+            ),
+        },
+        outputSchema: refreshSecurityPricesOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        // Rate limit check
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          // Verify every ID belongs to the calling user (matches controller).
+          for (const id of args.securityIds) {
+            await this.securitiesService.findOne(ctx.userId, id);
+          }
+
+          const result =
+            await this.securityPriceService.refreshPricesForSecurities(
+              args.securityIds,
+            );
+
+          this.writeLimiter.record(ctx.userId, "refresh_security_prices");
+
+          return toolResult(result);
         } catch (err: unknown) {
           return safeToolError(err);
         }
