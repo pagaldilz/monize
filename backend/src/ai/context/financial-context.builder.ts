@@ -26,6 +26,19 @@ export class FinancialContextBuilder {
   ) {}
 
   async buildQueryContext(userId: string): Promise<string> {
+    const [data] = await Promise.all([this.buildDataContext(userId)]);
+    return `${QUERY_SYSTEM_PROMPT}
+
+${data}`;
+  }
+
+  /**
+   * Build only the data portion of the system prompt (today's date, default
+   * currency, account list, category tree) — without any system-prompt
+   * preamble. Lets callers like the AI Agent service compose their own
+   * mode-specific prompt and append this shared data block.
+   */
+  async buildDataContext(userId: string): Promise<string> {
     const [accounts, categoryTree, preferences] = await Promise.all([
       this.accountsService.findAll(userId, false),
       this.categoriesService.getTree(userId),
@@ -46,9 +59,7 @@ export class FinancialContextBuilder {
 
     const categoryList = this.formatCategoryTree(categoryTree);
 
-    return `${QUERY_SYSTEM_PROMPT}
-
-TODAY'S DATE: ${today}
+    return `TODAY'S DATE: ${today}
 USER'S DEFAULT CURRENCY: ${currency}
 
 <USER_DATA>

@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { McpServerService } from "./mcp-server.service";
 import { McpUserContext } from "./mcp-context";
 import type { AiToolDefinition } from "../ai/providers/ai-provider.interface";
@@ -161,18 +161,23 @@ export class AiAgentToolRegistry {
 
   /**
    * Convert a registered tool's Zod input shape to a plain JSON-schema object
-   * for the LLM provider. Tools registered with an empty `{}` shape (no
-   * parameters) yield an empty object schema. Conversion is defensive: a tool
-   * whose schema `zodToJsonSchema` can't handle falls back to a permissive
-   * object schema rather than crashing the whole advertisement pass.
+   * for the LLM provider.
+   *
+   * Uses Zod v4's native `z.toJSONSchema()` rather than the third-party
+   * `zod-to-json-schema` library, which is incompatible with Zod v4 and
+   * silently returns a bare `{"$schema":"..."}` (empty properties/required/
+   * enum) for every schema — leaving the model with no idea what arguments a
+   * tool needs. Conversion is still defensive: a tool whose schema can't be
+   * converted falls back to a permissive empty object schema rather than
+   * crashing the whole advertisement pass.
    */
   private toJsonSchema(inputSchema: unknown): Record<string, unknown> {
     if (!inputSchema) return { type: "object", properties: {} };
     try {
-      return zodToJsonSchema(inputSchema as any, {
-        target: "openApi3",
-        $refStrategy: "none",
-      }) as Record<string, unknown>;
+      // z.toJSONSchema accepts any Zod schema (object, enum, etc.) and emits
+      // a proper draft-2020-12 JSON Schema with properties, required, enum,
+      // minLength/maxLength, etc. — exactly what the LLM providers expect.
+      return z.toJSONSchema(inputSchema as z.ZodType) as Record<string, unknown>;
     } catch {
       return { type: "object", properties: {} };
     }

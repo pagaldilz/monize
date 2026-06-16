@@ -14,6 +14,7 @@ import {
 import { OllamaModelDoesNotSupportToolsError } from "../ai/providers/ollama.provider";
 import { assessInjectionRisk } from "../ai/context/prompt-injection-detector";
 import { QUERY_SAFETY_REMINDER } from "../ai/context/prompt-templates";
+import { buildAgentSystemPrompt } from "./agent-prompt";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { AGENT_MAX_HISTORY_MESSAGES } from "./dto/ai-agent-query.dto";
 
@@ -141,10 +142,16 @@ export class AiAgentService {
       return;
     }
 
-    // Build the system prompt (reuse the AI Assistant's financial context).
+    // Build the system prompt: the agent's own mode-specific prompt (which
+    // documents the write tools in edit mode) + the shared financial data
+    // block (today's date, accounts, categories). This replaces the AI
+    // Assistant's QUERY_SYSTEM_PROMPT, whose "WRITE ACTION RULES" section is
+    // misleading for the agent (it says writes "only propose" — false here).
+    const editMode = writeMode === "edit";
     let systemPrompt: string;
     try {
-      systemPrompt = await this.contextBuilder.buildQueryContext(userId);
+      const dataContext = await this.contextBuilder.buildDataContext(userId);
+      systemPrompt = `${buildAgentSystemPrompt(editMode)}\n\n${dataContext}`;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to build context";

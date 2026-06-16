@@ -175,6 +175,29 @@ describe("AiAgentToolRegistry", () => {
     }
   });
 
+  it("renders real JSON-schema (properties, required, enum) — not empty {}", () => {
+    // Regression: zod-to-json-schema@3.x silently returned {} for every
+    // schema under Zod v4, leaving the model with no idea what arguments a
+    // tool needs. Verify the native z.toJSONSchema() path produces proper
+    // properties + required + type constraints.
+    const defs = registry.getToolDefinitions("read,reports");
+    const balance = defs.find((d) => d.name === "get_account_balance")!;
+    const schema = balance.inputSchema as Record<string, unknown>;
+
+    // Must have a non-empty properties object.
+    expect(schema.properties).toBeDefined();
+    const props = schema.properties as Record<string, unknown>;
+    expect(props.accountId).toBeDefined();
+
+    // accountId must be typed as a string.
+    const accountIdSchema = props.accountId as Record<string, unknown>;
+    expect(accountIdSchema.type).toBe("string");
+
+    // It must be in the required array (it's z.string().uuid(), not optional).
+    const required = schema.required as string[];
+    expect(required).toContain("accountId");
+  });
+
   it("rejects an unknown tool call with an error result", async () => {
     const sid = registry.beginSession("user-1", "read,reports,write");
     const result = await registry.callTool("does_not_exist", {}, sid);
