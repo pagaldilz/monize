@@ -817,6 +817,17 @@ export const unreconcileTransactionOutput = {
 };
 
 // accounts.tool.ts (Phase 2)
+export const createAccountOutput = {
+  id: str,
+  name: str,
+  accountType: str.optional(),
+  currencyCode: str.optional(),
+  openingBalance: num.optional(),
+  currentBalance: num.optional(),
+  isClosed: bool.optional(),
+  message: str,
+};
+
 export const updateAccountOutput = {
   dryRun: bool.optional(),
   preview: z.record(z.string(), z.unknown()).optional(),

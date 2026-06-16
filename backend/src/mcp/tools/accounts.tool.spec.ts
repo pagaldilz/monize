@@ -31,8 +31,8 @@ describe("McpAccountsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 6 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(6);
+  it("should register 7 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(7);
   });
 
   describe("get_account_balances", () => {

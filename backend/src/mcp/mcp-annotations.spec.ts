@@ -14,6 +14,7 @@ import { McpSafetyTools } from "./tools/safety.tool";
 
 // Tools that mutate state; everything else must be read-only.
 const WRITE_TOOLS = new Set([
+  "create_account",
   "create_transaction",
   "create_payee",
   "categorize_transaction",
@@ -68,7 +69,7 @@ const IDEMPOTENT_WRITES = new Set([
   "redo_action",
 ]);
 
-const EXPECTED_TOOL_COUNT = 65;
+const EXPECTED_TOOL_COUNT = 66;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;

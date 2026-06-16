@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AccountsService } from "../../accounts/accounts.service";
-import { AccountType } from "../../accounts/entities/account.entity";
+import { AccountType, Account } from "../../accounts/entities/account.entity";
 import {
   UserContextResolver,
   requireScope,
@@ -16,11 +16,12 @@ import {
   getAccountsOutput,
   getAccountBalanceOutput,
   getAccountBalancesOutput,
+  createAccountOutput,
   updateAccountOutput,
   closeAccountOutput,
   reopenAccountOutput,
 } from "../tool-output-schemas";
-import { READ_ONLY, UPDATE } from "../mcp-annotations";
+import { READ_ONLY, CREATE, UPDATE } from "../mcp-annotations";
 
 @Injectable()
 export class McpAccountsTools {
@@ -143,6 +144,166 @@ export class McpAccountsTools {
             args.accountTypes,
           );
           return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "create_account",
+      {
+        title: "Create account",
+        annotations: CREATE,
+        description:
+          "Create a new account. Requires an account type, a name, and a 3-letter currency code (e.g. USD). Optionally set the opening balance (defaults to 0), description, account number, institution, credit limit, interest rate, and favourite/exclude-from-net-worth flags. Returns the new account's id and starting balance. Creating loans, mortgages, or paired investment accounts requires additional fields and remains on the REST API — use this tool only for the common account types (chequing, savings, credit card, cash, line of credit, asset, other).",
+        inputSchema: {
+          accountType: z
+            .nativeEnum(AccountType)
+            .describe(
+              "Account type. One of: CHEQUING, SAVINGS, CREDIT_CARD, CASH, LINE_OF_CREDIT, ASSET, OTHER. (LOAN, MORTGAGE, and INVESTMENT require the REST API.)",
+            ),
+          name: z.string().max(100).describe("Account name"),
+          currencyCode: z
+            .string()
+            .length(3)
+            .describe("ISO 4217 currency code (e.g. USD, CAD, EUR)"),
+          openingBalance: z
+            .number()
+            .min(-999999999999)
+            .max(999999999999)
+            .optional()
+            .describe(
+              "Opening balance (defaults to 0). Becomes the starting current balance.",
+            ),
+          description: z
+            .string()
+            .max(500)
+            .optional()
+            .describe("Account description"),
+          accountNumber: z
+            .string()
+            .max(100)
+            .optional()
+            .describe("Account number (masked/last-4 is typical)"),
+          institution: z
+            .string()
+            .max(100)
+            .optional()
+            .describe(
+              "Institution name (free text). Prefer institutionId if the institution is already linked.",
+            ),
+          institutionId: z
+            .string()
+            .uuid()
+            .nullable()
+            .optional()
+            .describe("Linked institution ID"),
+          creditLimit: z
+            .number()
+            .min(0)
+            .optional()
+            .describe(
+              "Credit limit (credit cards / lines of credit). Must be positive.",
+            ),
+          interestRate: z
+            .number()
+            .min(0)
+            .max(100)
+            .optional()
+            .describe(
+              "Annual interest rate as a percentage (e.g. 19.99). 0-100.",
+            ),
+          isFavourite: z
+            .boolean()
+            .optional()
+            .describe("Mark the new account as a favourite (default false)"),
+          excludeFromNetWorth: z
+            .boolean()
+            .optional()
+            .describe(
+              "Exclude this account from net worth calculations (default false)",
+            ),
+        },
+        outputSchema: createAccountOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        // Block the specialized account types that need multi-field
+        // orchestration the REST API handles (loan/mortgage payment plans,
+        // investment cash+brokerage pairs). Mirrors update_account's note.
+        if (
+          args.accountType === AccountType.LOAN ||
+          args.accountType === AccountType.MORTGAGE ||
+          args.accountType === AccountType.INVESTMENT
+        ) {
+          return toolError(
+            `Creating ${args.accountType} accounts requires payment-plan / pairing details that this tool doesn't support. Please create it via the Monize app's Add Account flow, then I can update it.`,
+          );
+        }
+
+        try {
+          // create() returns Account | { cashAccount, brokerageAccount }, but
+          // only the INVESTMENT branch yields the pair — and we block that
+          // above. Cast so we can read the single-account fields below.
+          const account = (await this.accountsService.create(ctx.userId, {
+            accountType: args.accountType,
+            name: stripHtml(args.name) as string,
+            currencyCode: (args.currencyCode as string).toUpperCase(),
+            ...(args.openingBalance !== undefined && {
+              openingBalance: args.openingBalance,
+            }),
+            ...(args.description !== undefined && {
+              description: stripHtml(args.description),
+            }),
+            ...(args.accountNumber !== undefined && {
+              accountNumber: stripHtml(args.accountNumber),
+            }),
+            ...(args.institution !== undefined && {
+              institution: stripHtml(args.institution),
+            }),
+            ...(args.institutionId !== undefined && {
+              // null clears the institution; map to undefined so the service
+              // treats it as "not provided" rather than rejecting the DTO.
+              institutionId: args.institutionId ?? undefined,
+            }),
+            ...(args.creditLimit !== undefined && {
+              creditLimit: args.creditLimit,
+            }),
+            ...(args.interestRate !== undefined && {
+              interestRate: args.interestRate,
+            }),
+            ...(args.isFavourite !== undefined && {
+              isFavourite: args.isFavourite,
+            }),
+            ...(args.excludeFromNetWorth !== undefined && {
+              excludeFromNetWorth: args.excludeFromNetWorth,
+            }),
+          })) as Account;
+
+          this.writeLimiter.record(ctx.userId, "create_account");
+
+          return toolResult({
+            id: account.id,
+            name: account.name,
+            accountType: account.accountType,
+            currencyCode: account.currencyCode,
+            openingBalance: account.openingBalance,
+            currentBalance: account.currentBalance,
+            isClosed: account.isClosed,
+            message: "Account created successfully.",
+          });
         } catch (err: unknown) {
           return safeToolError(err);
         }
