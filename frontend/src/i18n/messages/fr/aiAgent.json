@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "Agent IA",
+    "subtitle": "Un agent basé sur MCP qui peut lire — et avec votre approbation, modifier — vos données financières"
+  },
+  "chat": {
+    "clearConversation": "Effacer la conversation",
+    "inputPlaceholderReadonly": "Demandez à l'agent à propos de vos finances (lecture seule)...",
+    "inputPlaceholderEdit": "Dites à l'agent quoi faire (mode édition)...",
+    "inputPlaceholderDisabled": "Fournisseur d'IA non configuré",
+    "keyboardHint": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne",
+    "cancelTitle": "Annuler",
+    "sendTitle": "Envoyer",
+    "editModeHint": "Mode édition : les modifications nécessitent votre confirmation avant d'être enregistrées"
+  },
+  "mode": {
+    "readonly": "Lecture seule",
+    "edit": "Modifier",
+    "readonlyTooltip": "L'agent peut uniquement lire vos données (par défaut)",
+    "editTooltip": "L'agent peut également créer et mettre à jour vos données",
+    "confirmWrites": "Confirmer avant chaque modification",
+    "editBadge": "Mode édition"
+  },
+  "confirmation": {
+    "title": "Approuver {tool} ?",
+    "approve": "Approuver",
+    "deny": "Refuser",
+    "approved": "Approuvé",
+    "denied": "Refusé"
+  },
+  "notConfigured": {
+    "heading": "IA non configurée",
+    "message": "Aucun fournisseur d'IA n'est configuré. Pour utiliser l'Agent IA, veuillez {link} dans vos paramètres.",
+    "linkText": "configurer un fournisseur d'IA"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Impossible d'enregistrer votre préférence — elle pourrait être réinitialisée au rechargement."
+  },
+  "thinking": "Réflexion..."
+}

@@ -94,8 +94,9 @@ export const useAuthStore = create<AuthState>()(
         // SECURITY: Clear AI chat history so conversations don't leak across accounts
         try {
           if (typeof window !== 'undefined') {
-            window.localStorage.removeItem('monize:ai-chat-messages');
-            window.localStorage.removeItem('monize:monte-carlo-results');
+          window.localStorage.removeItem('monize:ai-chat-messages');
+          window.localStorage.removeItem('monize:agent-chat-messages');
+          window.localStorage.removeItem('monize:monte-carlo-results');
           }
         } catch {
           // localStorage unavailable — nothing to do

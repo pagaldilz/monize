@@ -18,6 +18,7 @@ const NAMESPACES = [
   "accounts",
   "admin",
   "ai",
+  "aiAgent",
   "bills",
   "budgets",
   "categories",

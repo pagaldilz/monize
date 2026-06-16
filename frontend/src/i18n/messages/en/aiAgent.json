@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "AI Agent",
+    "subtitle": "An MCP-powered agent that can read — and with your approval, edit — your financial data"
+  },
+  "chat": {
+    "clearConversation": "Clear conversation",
+    "inputPlaceholderReadonly": "Ask the agent about your finances (read-only)...",
+    "inputPlaceholderEdit": "Tell the agent what to do (edit mode)...",
+    "inputPlaceholderDisabled": "AI provider not configured",
+    "keyboardHint": "Press Enter to send, Shift+Enter for a new line",
+    "cancelTitle": "Cancel",
+    "sendTitle": "Send",
+    "editModeHint": "Edit mode: changes require your confirmation before they're saved"
+  },
+  "mode": {
+    "readonly": "Read-only",
+    "edit": "Edit",
+    "readonlyTooltip": "The agent can only read your data (default)",
+    "editTooltip": "The agent can also create and update your data",
+    "confirmWrites": "Confirm before each change",
+    "editBadge": "Edit mode"
+  },
+  "confirmation": {
+    "title": "Approve {tool}?",
+    "approve": "Approve",
+    "deny": "Deny",
+    "approved": "Approved",
+    "denied": "Denied"
+  },
+  "notConfigured": {
+    "heading": "AI Not Configured",
+    "message": "No AI provider is configured. To use the AI Agent, please {link} in your settings.",
+    "linkText": "configure an AI provider"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Couldn't save your preference — it may reset on reload."
+  },
+  "thinking": "Thinking..."
+}

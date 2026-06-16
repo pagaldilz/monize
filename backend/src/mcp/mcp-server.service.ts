@@ -123,6 +123,20 @@ export class McpServerService {
       },
     );
 
+    this.registerAll(server, resolve);
+
+    return server;
+  }
+
+  /**
+   * Register every tool, resource, and prompt provider onto `server`.
+   *
+   * Extracted from `createServer` so the in-process AI Agent registry can
+   * reuse the exact same registration flow against a capturing proxy server
+   * (to obtain the `RegisteredTool` objects for direct in-process invocation)
+   * without duplicating the provider list in two places.
+   */
+  registerAll(server: McpServer, resolve: UserContextResolver): void {
     this.accountsTools.register(server, resolve);
     this.transactionsTools.register(server, resolve);
     this.categoriesTools.register(server, resolve);
@@ -146,7 +160,5 @@ export class McpServerService {
     this.budgetCheckPrompt.register(server);
     this.transactionLookupPrompt.register(server);
     this.spendingAnalysisPrompt.register(server);
-
-    return server;
   }
 }

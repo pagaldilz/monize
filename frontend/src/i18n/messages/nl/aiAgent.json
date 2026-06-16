@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "AI-agent",
+    "subtitle": "Een MCP-aangedreven agent die uw financiële gegevens kan lezen — en met uw goedkeuring kan bewerken"
+  },
+  "chat": {
+    "clearConversation": "Gesprek wissen",
+    "inputPlaceholderReadonly": "Vraag de agent over uw financiën (alleen-lezen)...",
+    "inputPlaceholderEdit": "Zeg de agent wat hij moet doen (bewerkingsmodus)...",
+    "inputPlaceholderDisabled": "AI-provider niet geconfigureerd",
+    "keyboardHint": "Druk op Enter om te verzenden, Shift+Enter voor een nieuwe regel",
+    "cancelTitle": "Annuleren",
+    "sendTitle": "Verzenden",
+    "editModeHint": "Bewerkingsmodus: wijzigingen vereisen uw bevestiging voordat ze worden opgeslagen"
+  },
+  "mode": {
+    "readonly": "Alleen-lezen",
+    "edit": "Bewerken",
+    "readonlyTooltip": "De agent kan alleen uw gegevens lezen (standaard)",
+    "editTooltip": "De agent kan ook uw gegevens maken en bijwerken",
+    "confirmWrites": "Bevestigen voor elke wijziging",
+    "editBadge": "Bewerkingsmodus"
+  },
+  "confirmation": {
+    "title": "{tool} goedkeuren?",
+    "approve": "Goedkeuren",
+    "deny": "Weigeren",
+    "approved": "Goedgekeurd",
+    "denied": "Geweigerd"
+  },
+  "notConfigured": {
+    "heading": "AI niet geconfigureerd",
+    "message": "Er is geen AI-provider geconfigureerd. Om de AI-agent te gebruiken, {link} in uw instellingen.",
+    "linkText": "configureer een AI-provider"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Kon uw voorkeur niet opslaan — deze kan mogelijk teruggezet worden bij herladen."
+  },
+  "thinking": "Denken..."
+}

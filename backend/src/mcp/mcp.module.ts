@@ -16,6 +16,7 @@ import { ActionHistoryModule } from "../action-history/action-history.module";
 import { OAuthModule } from "../oauth/oauth.module";
 
 import { McpServerService } from "./mcp-server.service";
+import { AiAgentToolRegistry } from "./ai-agent-tool-registry";
 import { McpHttpController } from "./mcp-http.controller";
 
 import { McpAccountsTools } from "./tools/accounts.tool";
@@ -62,6 +63,7 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
   ],
   providers: [
     McpServerService,
+    AiAgentToolRegistry,
     McpAccountsTools,
     McpTransactionsTools,
     McpCategoriesTools,
@@ -85,6 +87,6 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     McpSpendingAnalysisPrompt,
   ],
   controllers: [McpHttpController],
-  exports: [McpServerService],
+  exports: [McpServerService, AiAgentToolRegistry],
 })
 export class McpModule {}

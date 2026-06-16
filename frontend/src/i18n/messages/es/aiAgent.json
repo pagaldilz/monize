@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "Agente AI",
+    "subtitle": "Un agente basado en MCP que puede leer — y con su aprobación, editar — sus datos financieros"
+  },
+  "chat": {
+    "clearConversation": "Borrar conversación",
+    "inputPlaceholderReadonly": "Pregunte al agente sobre sus finanzas (solo lectura)...",
+    "inputPlaceholderEdit": "Dígale al agente qué hacer (modo edición)...",
+    "inputPlaceholderDisabled": "Proveedor de IA no configurado",
+    "keyboardHint": "Presione Enter para enviar, Mayús+Enter para una nueva línea",
+    "cancelTitle": "Cancelar",
+    "sendTitle": "Enviar",
+    "editModeHint": "Modo edición: los cambios requieren su confirmación antes de guardarse"
+  },
+  "mode": {
+    "readonly": "Solo lectura",
+    "edit": "Editar",
+    "readonlyTooltip": "El agente solo puede leer sus datos (predeterminado)",
+    "editTooltip": "El agente también puede crear y actualizar sus datos",
+    "confirmWrites": "Confirmar antes de cada cambio",
+    "editBadge": "Modo edición"
+  },
+  "confirmation": {
+    "title": "¿Aprobar {tool}?",
+    "approve": "Aprobar",
+    "deny": "Denegar",
+    "approved": "Aprobado",
+    "denied": "Denegado"
+  },
+  "notConfigured": {
+    "heading": "IA no configurada",
+    "message": "No hay ningún proveedor de IA configurado. Para usar el Agente AI, {link} en su configuración.",
+    "linkText": "configure un proveedor de IA"
+  },
+  "errors": {
+    "preferenceSaveFailed": "No se pudo guardar su preferencia — puede restablecerse al recargar."
+  },
+  "thinking": "Pensando..."
+}

@@ -217,6 +217,12 @@ export class UsersService {
     if (dto.language !== undefined) {
       preferences.language = dto.language;
     }
+    if (dto.aiAgentWriteMode !== undefined) {
+      preferences.aiAgentWriteMode = dto.aiAgentWriteMode;
+    }
+    if (dto.aiAgentConfirmWrites !== undefined) {
+      preferences.aiAgentConfirmWrites = dto.aiAgentConfirmWrites;
+    }
 
     const saved = await this.preferencesRepository.save(preferences);
 

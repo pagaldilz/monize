@@ -106,6 +106,36 @@ export class UserPreference {
   @Column({ length: 10, default: "en" })
   language: string;
 
+  /**
+   * AI Agent chatbox write-mode toggle.
+   * - "readonly": the in-app agent session is scoped to read/reports only
+   *   (write tools are neither advertised nor executable). Default.
+   * - "edit": the session also carries the "write" scope, allowing the agent
+   *   to run create/update tools (still gated by the per-tool write limiter,
+   *   dryRun previews, confirmMerge, and action history).
+   */
+  @Column({
+    name: "ai_agent_write_mode",
+    type: "varchar",
+    length: 10,
+    default: "readonly",
+  })
+  aiAgentWriteMode: "readonly" | "edit";
+
+  /**
+   * When true (default) and the agent is in "edit" mode, each create/update
+   * tool call is preceded by a dryRun preview emitted as a confirmation
+   * request; the user must approve before the change is persisted. Turning
+   * this off lets edits execute directly (the write limiter + undo/redo
+   * remain as safety nets).
+   */
+  @Column({
+    name: "ai_agent_confirm_writes",
+    type: "boolean",
+    default: true,
+  })
+  aiAgentConfirmWrites: boolean;
+
   // Set opportunistically by RequestContextInterceptor when an authenticated
   // request carries an X-Client-Timezone header. Cron jobs prefer the user's
   // explicit `timezone` setting; this is the fallback when `timezone` is the

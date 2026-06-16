@@ -43,6 +43,7 @@ import { HealthModule } from "./health/health.module";
 import { AdminModule } from "./admin/admin.module";
 import { AiModule } from "./ai/ai.module";
 import { McpModule } from "./mcp/mcp.module";
+import { AiAgentModule } from "./ai-agent/ai-agent.module";
 import { OAuthModule } from "./oauth/oauth.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { TagsModule } from "./tags/tags.module";
@@ -132,6 +133,7 @@ import { I18nModule } from "./i18n/i18n.module";
     AdminModule,
     AiModule,
     McpModule,
+    AiAgentModule,
     OAuthModule,
     BudgetsModule,
     TagsModule,

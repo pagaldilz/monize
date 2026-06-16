@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "Agente AI",
+    "subtitle": "Un agente basato su MCP che può leggere — e con la tua approvazione, modificare — i tuoi dati finanziari"
+  },
+  "chat": {
+    "clearConversation": "Cancella conversazione",
+    "inputPlaceholderReadonly": "Chiedi all'agente informazioni sulle tue finanze (sola lettura)...",
+    "inputPlaceholderEdit": "Dì all'agente cosa fare (modalità modifica)...",
+    "inputPlaceholderDisabled": "Provider IA non configurato",
+    "keyboardHint": "Premi Invio per inviare, Maiusc+Invio per una nuova riga",
+    "cancelTitle": "Annulla",
+    "sendTitle": "Invia",
+    "editModeHint": "Modalità modifica: le modifiche richiedono la tua conferma prima di essere salvate"
+  },
+  "mode": {
+    "readonly": "Sola lettura",
+    "edit": "Modifica",
+    "readonlyTooltip": "L'agente può solo leggere i tuoi dati (predefinito)",
+    "editTooltip": "L'agente può anche creare e aggiornare i tuoi dati",
+    "confirmWrites": "Conferma prima di ogni modifica",
+    "editBadge": "Modalità modifica"
+  },
+  "confirmation": {
+    "title": "Approvare {tool}?",
+    "approve": "Approva",
+    "deny": "Nega",
+    "approved": "Approvato",
+    "denied": "Negato"
+  },
+  "notConfigured": {
+    "heading": "IA non configurata",
+    "message": "Nessun provider IA configurato. Per usare l'Agente AI, {link} nelle tue impostazioni.",
+    "linkText": "configura un provider IA"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Impossibile salvare la preferenza — potrebbe ripristinarsi al ricaricamento."
+  },
+  "thinking": "Pensiero..."
+}

@@ -220,4 +220,23 @@ export class UpdatePreferencesDto {
       "language must be 'browser', an ISO 639-1 code (e.g. 'en'), or a BCP 47 tag (e.g. 'pt-BR')",
   })
   language?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "AI Agent chatbox mode. 'readonly' (default) scopes the in-app agent to read/reports only; 'edit' also allows create/update tools.",
+    example: "readonly",
+    enum: ["readonly", "edit"],
+  })
+  @IsOptional()
+  @IsIn(["readonly", "edit"])
+  aiAgentWriteMode?: "readonly" | "edit";
+
+  @ApiPropertyOptional({
+    description:
+      "When in 'edit' mode, require an explicit confirmation (dryRun preview) before each create/update tool persists. Default true.",
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  aiAgentConfirmWrites?: boolean;
 }

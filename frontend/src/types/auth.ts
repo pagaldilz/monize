@@ -110,6 +110,9 @@ export interface UserPreferences {
   defaultQuoteProvider: 'yahoo' | 'msn';
   recentTransactionsLimit: number;
   language: string;
+  // AI Agent chatbox (/ai-mcp) preferences.
+  aiAgentWriteMode: 'readonly' | 'edit';
+  aiAgentConfirmWrites: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,6 +173,8 @@ export interface UpdatePreferencesData {
   defaultQuoteProvider?: 'yahoo' | 'msn';
   recentTransactionsLimit?: number;
   language?: string;
+  aiAgentWriteMode?: 'readonly' | 'edit';
+  aiAgentConfirmWrites?: boolean;
 }
 
 export interface ChangePasswordData {

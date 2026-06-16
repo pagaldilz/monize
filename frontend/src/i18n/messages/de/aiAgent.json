@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "KI-Agent",
+    "subtitle": "Ein MCP-gestützter Agent, der Ihre Finanzdaten lesen — und mit Ihrer Genehmigung bearbeiten — kann"
+  },
+  "chat": {
+    "clearConversation": "Unterhaltung löschen",
+    "inputPlaceholderReadonly": "Fragen Sie den Agent zu Ihren Finanzen (schreibgeschützt)...",
+    "inputPlaceholderEdit": "Sagen Sie dem Agent, was er tun soll (Bearbeitungsmodus)...",
+    "inputPlaceholderDisabled": "KI-Anbieter nicht konfiguriert",
+    "keyboardHint": "Enter zum Senden, Umschalt+Enter für eine neue Zeile",
+    "cancelTitle": "Abbrechen",
+    "sendTitle": "Senden",
+    "editModeHint": "Bearbeitungsmodus: Änderungen erfordern Ihre Bestätigung, bevor sie gespeichert werden"
+  },
+  "mode": {
+    "readonly": "Schreibgeschützt",
+    "edit": "Bearbeiten",
+    "readonlyTooltip": "Der Agent kann Ihre Daten nur lesen (Standard)",
+    "editTooltip": "Der Agent kann Ihre Daten auch erstellen und aktualisieren",
+    "confirmWrites": "Vor jeder Änderung bestätigen",
+    "editBadge": "Bearbeitungsmodus"
+  },
+  "confirmation": {
+    "title": "{tool} genehmigen?",
+    "approve": "Genehmigen",
+    "deny": "Ablehnen",
+    "approved": "Genehmigt",
+    "denied": "Abgelehnt"
+  },
+  "notConfigured": {
+    "heading": "KI nicht konfiguriert",
+    "message": "Es ist kein KI-Anbieter konfiguriert. Um den KI-Agent zu verwenden, {link} Sie bitte in Ihren Einstellungen.",
+    "linkText": "konfigurieren Sie einen KI-Anbieter"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Einstellung konnte nicht gespeichert werden — sie wird möglicherweise beim Neuladen zurückgesetzt."
+  },
+  "thinking": "Denke nach..."
+}

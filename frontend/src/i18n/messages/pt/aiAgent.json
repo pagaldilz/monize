@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "Agente de IA",
+    "subtitle": "Um agente baseado em MCP que pode ler — e com a sua aprovação, editar — os seus dados financeiros"
+  },
+  "chat": {
+    "clearConversation": "Limpar conversa",
+    "inputPlaceholderReadonly": "Pergunte ao agente sobre as suas finanças (apenas leitura)...",
+    "inputPlaceholderEdit": "Diga ao agente o que fazer (modo de edição)...",
+    "inputPlaceholderDisabled": "Fornecedor de IA não configurado",
+    "keyboardHint": "Prima Enter para enviar, Shift+Enter para uma nova linha",
+    "cancelTitle": "Cancelar",
+    "sendTitle": "Enviar",
+    "editModeHint": "Modo de edição: as alterações requerem a sua confirmação antes de serem guardadas"
+  },
+  "mode": {
+    "readonly": "Apenas leitura",
+    "edit": "Editar",
+    "readonlyTooltip": "O agente só pode ler os seus dados (predefinição)",
+    "editTooltip": "O agente também pode criar e atualizar os seus dados",
+    "confirmWrites": "Confirmar antes de cada alteração",
+    "editBadge": "Modo de edição"
+  },
+  "confirmation": {
+    "title": "Aprovar {tool}?",
+    "approve": "Aprovar",
+    "deny": "Recusar",
+    "approved": "Aprovado",
+    "denied": "Recusado"
+  },
+  "notConfigured": {
+    "heading": "IA não configurada",
+    "message": "Nenhum fornecedor de IA está configurado. Para usar o Agente de IA, {link} nas suas definições.",
+    "linkText": "configure um fornecedor de IA"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Não foi possível guardar a sua preferência — ela pode ser reposta ao recarregar."
+  },
+  "thinking": "A pensar..."
+}

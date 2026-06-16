@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "Agent AI",
+    "subtitle": "Agent oparty na MCP, który może odczytywać — a za Twoją zgodą edytować — Twoje dane finansowe"
+  },
+  "chat": {
+    "clearConversation": "Wyczyść rozmowę",
+    "inputPlaceholderReadonly": "Zapytaj agenta o swoje finanse (tylko do odczytu)...",
+    "inputPlaceholderEdit": "Powiedz agentowi, co ma zrobić (tryb edycji)...",
+    "inputPlaceholderDisabled": "Dostawca AI nie jest skonfigurowany",
+    "keyboardHint": "Naciśnij Enter, aby wysłać, Shift+Enter dla nowej linii",
+    "cancelTitle": "Anuluj",
+    "sendTitle": "Wyślij",
+    "editModeHint": "Tryb edycji: zmiany wymagają Twojego potwierdzenia przed zapisaniem"
+  },
+  "mode": {
+    "readonly": "Tylko do odczytu",
+    "edit": "Edytuj",
+    "readonlyTooltip": "Agent może tylko odczytywać Twoje dane (domyślnie)",
+    "editTooltip": "Agent może również tworzyć i aktualizować Twoje dane",
+    "confirmWrites": "Potwierdź przed każdą zmianą",
+    "editBadge": "Tryb edycji"
+  },
+  "confirmation": {
+    "title": "Zatwierdzić {tool}?",
+    "approve": "Zatwierdź",
+    "deny": "Odrzuć",
+    "approved": "Zatwierdzone",
+    "denied": "Odrzucone"
+  },
+  "notConfigured": {
+    "heading": "AI nie jest skonfigurowane",
+    "message": "Nie skonfigurowano dostawcy AI. Aby używać Agenta AI, {link} w swoich ustawieniach.",
+    "linkText": "skonfiguruj dostawcę AI"
+  },
+  "errors": {
+    "preferenceSaveFailed": "Nie udało się zapisać preferencji — może zostać przywrócona po ponownym załadowaniu."
+  },
+  "thinking": "Myślenie..."
+}
