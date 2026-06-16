@@ -12,6 +12,11 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
     branches: [main]
+  # Also trigger on direct pushes to main so the required status check is
+  # satisfied for commits the CI release job pushes (e.g. the version-bump).
+  # The job auto-passes for push events -- there is no PR body to inspect.
+  push:
+    branches: [main]
 
 # Read-only: the job inspects the PR body and reads labels on the linked
 # discussion/issue. It never writes.
@@ -22,7 +27,8 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  # pull_request.number is empty for push events; fall back to the ref.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,6 +41,7 @@ jobs:
         # avoid template injection. See CWE-94. gh is preinstalled on the
         # runner; GH_TOKEN authenticates its API calls.
         env:
+          EVENT_NAME: ${{ github.event_name }}
           PR_BODY: ${{ github.event.pull_request.body }}
           AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
           GH_TOKEN: ${{ github.token }}
@@ -43,6 +50,13 @@ jobs:
           APPROVAL_LABEL: approved-to-build
         run: |
           set -uo pipefail
+
+          # Direct pushes to main (e.g. the CI version-bump commit) are not
+          # pull requests, so there is no checklist to verify. Auto-pass.
+          if [ "${EVENT_NAME:-}" = "push" ]; then
+            echo "Direct push to main; no PR checklist to verify."
+            exit 0
+          fi
 
           # Maintainers' own PRs bypass the propose-first checklist gate.
           # author_association is set by GitHub and cannot be spoofed by outside

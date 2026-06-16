@@ -7,5 +7,4 @@
 # config is covered in our self-hosting docs, not enforced here.
 10038	IGNORE	(Content Security Policy headers - validated by Lighthouse)
 10202	IGNORE	(Absence of Anti-CSRF Tokens - we use double-submit cookie pattern; ZAP cannot see the cookie/header pair)
-10038-1	IGNORE	(CSP header reports inline-script - intentional via nonce/strict-dynamic in proxy.ts)
 10063	IGNORE	(Permissions-Policy header missing - acceptable for self-hosted; doc'd in security guide)
