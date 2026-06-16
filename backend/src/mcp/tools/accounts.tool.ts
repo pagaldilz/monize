@@ -10,15 +10,22 @@ import {
   toolError,
   safeToolError,
 } from "../mcp-context";
+import { McpWriteLimiter } from "../mcp-write-limiter";
+import { stripHtml } from "../../common/sanitization.util";
 import {
   getAccountsOutput,
   getAccountBalanceOutput,
   getAccountBalancesOutput,
+  updateAccountOutput,
+  closeAccountOutput,
+  reopenAccountOutput,
 } from "../tool-output-schemas";
-import { READ_ONLY } from "../mcp-annotations";
+import { READ_ONLY, UPDATE } from "../mcp-annotations";
 
 @Injectable()
 export class McpAccountsTools {
+  private readonly writeLimiter = new McpWriteLimiter();
+
   constructor(private readonly accountsService: AccountsService) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -136,6 +143,255 @@ export class McpAccountsTools {
             args.accountTypes,
           );
           return toolResult(data);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "update_account",
+      {
+        title: "Update account",
+        annotations: UPDATE,
+        description:
+          "Update an account's commonly-used fields (name, currency, description, credit limit, interest rate, favourite flag, exclude-from-net-worth, account number, institution). Only provided fields change. Set dryRun=true to preview against the current account without saving. Loan/mortgage-specific account edits remain on the REST API.",
+        inputSchema: {
+          accountId: z.string().uuid().describe("Account ID"),
+          name: z.string().max(100).optional().describe("Account name"),
+          currencyCode: z
+            .string()
+            .max(10)
+            .optional()
+            .describe("ISO 4217 currency code (e.g. USD)"),
+          description: z
+            .string()
+            .max(500)
+            .optional()
+            .describe("Account description"),
+          creditLimit: z
+            .number()
+            .min(0)
+            .optional()
+            .describe("Credit limit (credit cards / lines of credit)"),
+          interestRate: z
+            .number()
+            .min(0)
+            .max(100)
+            .optional()
+            .describe("Annual interest rate as a percentage (loans/mortgages)"),
+          isFavourite: z
+            .boolean()
+            .optional()
+            .describe("Mark as a favourite account"),
+          excludeFromNetWorth: z
+            .boolean()
+            .optional()
+            .describe("Exclude this account from net worth calculations"),
+          accountNumber: z
+            .string()
+            .max(100)
+            .optional()
+            .describe("Account number (masked/last-4 is typical)"),
+          institutionId: z
+            .string()
+            .uuid()
+            .nullable()
+            .optional()
+            .describe("Institution ID, or null to clear"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("If true, preview without saving"),
+        },
+        outputSchema: updateAccountOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const existing = await this.accountsService.findOne(
+            ctx.userId,
+            args.accountId,
+          );
+
+          // Dry-run: show current vs. proposed values.
+          if (args.dryRun) {
+            const proposed: Record<string, unknown> = {
+              name: args.name !== undefined ? args.name : existing.name,
+              currencyCode:
+                args.currencyCode !== undefined
+                  ? args.currencyCode
+                  : existing.currencyCode,
+              description:
+                args.description !== undefined
+                  ? stripHtml(args.description)
+                  : existing.description,
+              creditLimit:
+                args.creditLimit !== undefined
+                  ? args.creditLimit
+                  : existing.creditLimit,
+              interestRate:
+                args.interestRate !== undefined
+                  ? args.interestRate
+                  : existing.interestRate,
+              isFavourite:
+                args.isFavourite !== undefined
+                  ? args.isFavourite
+                  : existing.isFavourite,
+              excludeFromNetWorth:
+                args.excludeFromNetWorth !== undefined
+                  ? args.excludeFromNetWorth
+                  : existing.excludeFromNetWorth,
+              accountNumber:
+                args.accountNumber !== undefined
+                  ? args.accountNumber
+                  : existing.accountNumber,
+              institutionId:
+                args.institutionId !== undefined
+                  ? args.institutionId
+                  : existing.institutionId,
+            };
+            return toolResult({
+              dryRun: true,
+              preview: proposed,
+              message:
+                "This is a preview. Call again with dryRun=false to apply the update.",
+            });
+          }
+
+          const dto: Record<string, unknown> = {};
+          if (args.name !== undefined) dto.name = stripHtml(args.name);
+          if (args.currencyCode !== undefined)
+            dto.currencyCode = args.currencyCode;
+          if (args.description !== undefined)
+            dto.description = stripHtml(args.description);
+          if (args.creditLimit !== undefined) dto.creditLimit = args.creditLimit;
+          if (args.interestRate !== undefined)
+            dto.interestRate = args.interestRate;
+          if (args.isFavourite !== undefined) dto.isFavourite = args.isFavourite;
+          if (args.excludeFromNetWorth !== undefined)
+            dto.excludeFromNetWorth = args.excludeFromNetWorth;
+          if (args.accountNumber !== undefined)
+            dto.accountNumber = args.accountNumber;
+          if (args.institutionId !== undefined)
+            dto.institutionId = args.institutionId;
+
+          const account = await this.accountsService.update(
+            ctx.userId,
+            args.accountId,
+            dto as any,
+          );
+
+          this.writeLimiter.record(ctx.userId, "update_account");
+
+          return toolResult({
+            id: account.id,
+            name: account.name,
+            currencyCode: account.currencyCode,
+            isClosed: account.isClosed,
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "close_account",
+      {
+        title: "Close account",
+        annotations: UPDATE,
+        description:
+          "Soft-close an account (reversible via reopen_account). Closed accounts are excluded from balances by default but retain all transaction history. Not a deletion.",
+        inputSchema: {
+          accountId: z.string().uuid().describe("Account ID"),
+        },
+        outputSchema: closeAccountOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const account = await this.accountsService.close(
+            ctx.userId,
+            args.accountId,
+          );
+
+          this.writeLimiter.record(ctx.userId, "close_account");
+
+          return toolResult({
+            id: account.id,
+            name: account.name,
+            isClosed: account.isClosed,
+            message: "Account closed. Use reopen_account to reverse.",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "reopen_account",
+      {
+        title: "Reopen account",
+        annotations: UPDATE,
+        description:
+          "Reopen a previously closed account. Idempotent: reopening an already-open account is a no-op.",
+        inputSchema: {
+          accountId: z.string().uuid().describe("Account ID"),
+        },
+        outputSchema: reopenAccountOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const account = await this.accountsService.reopen(
+            ctx.userId,
+            args.accountId,
+          );
+
+          this.writeLimiter.record(ctx.userId, "reopen_account");
+
+          return toolResult({
+            id: account.id,
+            name: account.name,
+            isClosed: account.isClosed,
+            message: "Account reopened",
+          });
         } catch (err: unknown) {
           return safeToolError(err);
         }

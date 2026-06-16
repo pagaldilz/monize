@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
 import { AccountsService } from "../../accounts/accounts.service";
+import { TagsService } from "../../tags/tags.service";
 import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import {
   UserContextResolver,
@@ -32,6 +33,10 @@ import {
   createTransferOutput,
   setTransactionStatusOutput,
   clearTransactionOutput,
+  updateTransactionSplitsOutput,
+  setTransactionTagsOutput,
+  bulkUpdateTransactionsOutput,
+  unreconcileTransactionOutput,
 } from "../tool-output-schemas";
 import { READ_ONLY, CREATE, UPDATE } from "../mcp-annotations";
 
@@ -43,6 +48,7 @@ export class McpTransactionsTools {
     private readonly transactionsService: TransactionsService,
     private readonly analyticsService: TransactionAnalyticsService,
     private readonly accountsService: AccountsService,
+    private readonly tagsService: TagsService,
   ) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -936,6 +942,305 @@ export class McpTransactionsTools {
             message: args.isCleared
               ? "Transaction marked cleared"
               : "Transaction marked uncleared",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "update_transaction_splits",
+      {
+        title: "Update transaction splits",
+        annotations: UPDATE,
+        description:
+          "Replace all splits on a transaction atomically. Each split specifies an amount plus exactly one of categoryId (categorized split), transferAccountId (transfer split). Splits should sum to the transaction total. Set dryRun=true to preview the proposed splits without saving.",
+        inputSchema: {
+          transactionId: z.string().uuid().describe("Transaction ID"),
+          splits: z
+            .array(
+              z
+                .object({
+                  amount: z
+                    .number()
+                    .min(-999999999999)
+                    .max(999999999999)
+                    .describe("Split amount (signed)"),
+                  categoryId: z
+                    .string()
+                    .uuid()
+                    .optional()
+                    .describe("Category for a categorized split"),
+                  transferAccountId: z
+                    .string()
+                    .uuid()
+                    .optional()
+                    .describe("Destination account for a transfer split"),
+                  memo: z
+                    .string()
+                    .max(500)
+                    .optional()
+                    .describe("Memo for this split line"),
+                }),
+            )
+            .min(1)
+            .max(100)
+            .describe("Full replacement set of splits"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("If true, preview without saving"),
+        },
+        outputSchema: updateTransactionSplitsOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          // Dry-run preview without persisting.
+          if (args.dryRun) {
+            return toolResult({
+              dryRun: true,
+              preview: {
+                transactionId: args.transactionId,
+                splitCount: args.splits.length,
+                splits: args.splits.map((s) => ({
+                  amount: s.amount,
+                  categoryId: s.categoryId ?? null,
+                  transferAccountId: s.transferAccountId ?? null,
+                  memo: stripHtml(s.memo) || null,
+                })),
+              },
+              message:
+                "This is a preview. Call again with dryRun=false to apply the splits.",
+            });
+          }
+
+          const splitsDto = args.splits.map((s) => ({
+            amount: s.amount,
+            categoryId: s.categoryId,
+            transferAccountId: s.transferAccountId,
+            memo: stripHtml(s.memo),
+          }));
+
+          await this.transactionsService.updateSplits(
+            ctx.userId,
+            args.transactionId,
+            splitsDto as any,
+          );
+
+          this.writeLimiter.record(ctx.userId, "update_transaction_splits");
+
+          return toolResult({
+            transactionId: args.transactionId,
+            splitCount: splitsDto.length,
+            message: "Transaction splits updated successfully",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "set_transaction_tags",
+      {
+        title: "Set transaction tags",
+        annotations: UPDATE,
+        description:
+          "Replace the set of tags on a transaction. Pass an empty array to clear all tags. Idempotent: calling twice with the same tagIds yields the same state.",
+        inputSchema: {
+          transactionId: z.string().uuid().describe("Transaction ID"),
+          tagIds: z
+            .array(z.string().uuid())
+            .max(50)
+            .describe(
+              "Full set of tag IDs to assign (empty array clears all tags)",
+            ),
+        },
+        outputSchema: setTransactionTagsOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          // NOTE: TagsService.setTransactionTags takes (transactionId, tagIds, userId)
+          // — userId is the 3rd parameter, not the first.
+          await this.tagsService.setTransactionTags(
+            args.transactionId,
+            args.tagIds,
+            ctx.userId,
+          );
+
+          this.writeLimiter.record(ctx.userId, "set_transaction_tags");
+
+          return toolResult({
+            transactionId: args.transactionId,
+            tagIds: args.tagIds,
+            message: "Transaction tags updated successfully",
+          });
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "bulk_update_transactions",
+      {
+        title: "Bulk update transactions",
+        annotations: UPDATE,
+        description:
+          "Update many transactions at once by a list of IDs or by filters. Provide the fields to set (payeeId/payeeName/categoryId/description/status/tagIds). Use dryRun=true to see how many transactions match without applying any changes. This is the highest-leverage cleanup tool (e.g. re-categorize all transactions from a payee) without deleting anything.",
+        inputSchema: {
+          mode: z
+            .enum(["ids", "filter"])
+            .describe(
+              "'ids' to target specific transaction IDs; 'filter' to target by criteria",
+            ),
+          transactionIds: z
+            .array(z.string().uuid())
+            .max(500)
+            .optional()
+            .describe("Required when mode='ids'"),
+          filters: z
+            .object({
+              accountIds: z.array(z.string().uuid()).optional(),
+              startDate: z.string().max(10).optional(),
+              endDate: z.string().max(10).optional(),
+              categoryIds: z.array(z.string().uuid()).optional(),
+              payeeIds: z.array(z.string().uuid()).optional(),
+              search: z.string().max(200).optional(),
+            })
+            .optional()
+            .describe("Required when mode='filter'"),
+          payeeId: z.string().uuid().nullable().optional(),
+          payeeName: z.string().max(100).optional(),
+          categoryId: z.string().uuid().nullable().optional(),
+          description: z.string().max(500).optional(),
+          status: z.nativeEnum(TransactionStatus).optional(),
+          tagIds: z.array(z.string().uuid()).optional(),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe("If true, count matches without applying changes"),
+        },
+        outputSchema: bulkUpdateTransactionsOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          // Dry-run: echo the request and warn that an exact match count is not
+          // computed (avoids re-implementing the selection logic here). The
+          // caller can use search_transactions to preview matches first.
+          if (args.dryRun) {
+            return toolResult({
+              dryRun: true,
+              message:
+                "Dry-run requested. Use search_transactions with the same filters to preview matching transactions before applying.",
+            });
+          }
+
+          const dto: Record<string, unknown> = {
+            mode: args.mode,
+            payeeId: args.payeeId,
+            payeeName: stripHtml(args.payeeName),
+            categoryId: args.categoryId,
+            description: stripHtml(args.description),
+            status: args.status,
+            tagIds: args.tagIds,
+          };
+          if (args.mode === "ids") {
+            dto.transactionIds = args.transactionIds ?? [];
+          } else {
+            dto.filters = args.filters ?? {};
+          }
+
+          const result = await this.transactionsService.bulkUpdate(
+            ctx.userId,
+            dto as any,
+          );
+
+          this.writeLimiter.record(ctx.userId, "bulk_update_transactions");
+
+          return toolResult(result);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "unreconcile_transaction",
+      {
+        title: "Unreconcile transaction",
+        annotations: UPDATE,
+        description:
+          "Mark a previously reconciled transaction as unreconciled. Counterpart to reconciliation; idempotent.",
+        inputSchema: {
+          id: z.string().uuid().describe("Transaction ID"),
+        },
+        outputSchema: unreconcileTransactionOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          const transaction = await this.transactionsService.unreconcile(
+            ctx.userId,
+            args.id,
+          );
+
+          this.writeLimiter.record(ctx.userId, "unreconcile_transaction");
+
+          return toolResult({
+            id: transaction.id,
+            status: transaction.status,
+            message: "Transaction unreconciled",
           });
         } catch (err: unknown) {
           return safeToolError(err);

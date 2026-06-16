@@ -9,6 +9,8 @@ import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
 import { McpPlanningTools } from "./tools/planning.tool";
+import { McpTagsTools } from "./tools/tags.tool";
+import { McpSafetyTools } from "./tools/safety.tool";
 
 // Tools that mutate state; everything else must be read-only.
 const WRITE_TOOLS = new Set([
@@ -22,6 +24,23 @@ const WRITE_TOOLS = new Set([
   "clear_transaction",
   "skip_scheduled_transaction",
   "refresh_security_prices",
+  "update_transaction_splits",
+  "set_transaction_tags",
+  "bulk_update_transactions",
+  "unreconcile_transaction",
+  "update_account",
+  "close_account",
+  "reopen_account",
+  "create_category",
+  "update_category",
+  "reassign_category_transactions",
+  "update_payee",
+  "merge_payees",
+  "reactivate_payee",
+  "create_tag",
+  "update_tag",
+  "undo_last_action",
+  "redo_action",
 ]);
 // Write tools whose repeated calls converge to the same state.
 // (Every tool using the UPDATE annotation preset lands here; CREATE tools do not.)
@@ -32,9 +51,24 @@ const IDEMPOTENT_WRITES = new Set([
   "clear_transaction",
   "skip_scheduled_transaction",
   "refresh_security_prices",
+  "update_transaction_splits",
+  "set_transaction_tags",
+  "bulk_update_transactions",
+  "unreconcile_transaction",
+  "update_account",
+  "close_account",
+  "reopen_account",
+  "update_category",
+  "reassign_category_transactions",
+  "update_payee",
+  "merge_payees",
+  "reactivate_payee",
+  "update_tag",
+  "undo_last_action",
+  "redo_action",
 ]);
 
-const EXPECTED_TOOL_COUNT = 47;
+const EXPECTED_TOOL_COUNT = 65;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;
@@ -46,6 +80,7 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
   const providers: ToolProvider[] = [
     new McpAccountsTools({} as any) as unknown as ToolProvider,
     new McpTransactionsTools(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -71,6 +106,8 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
       {} as any,
       {} as any,
     ) as unknown as ToolProvider,
+    new McpTagsTools({} as any) as unknown as ToolProvider,
+    new McpSafetyTools({} as any) as unknown as ToolProvider,
   ];
 
   const configs: Array<{ name: string; config: any }> = [];

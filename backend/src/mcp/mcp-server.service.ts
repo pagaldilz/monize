@@ -12,6 +12,8 @@ import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
 import { McpPlanningTools } from "./tools/planning.tool";
+import { McpTagsTools } from "./tools/tags.tool";
+import { McpSafetyTools } from "./tools/safety.tool";
 import { McpAccountListResource } from "./resources/account-list.resource";
 import { McpCategoryTreeResource } from "./resources/category-tree.resource";
 import { McpRecentTransactionsResource } from "./resources/recent-transactions.resource";
@@ -41,6 +43,8 @@ export class McpServerService {
     private readonly calculateTools: McpCalculateTools,
     private readonly budgetsTools: McpBudgetsTools,
     private readonly planningTools: McpPlanningTools,
+    private readonly tagsTools: McpTagsTools,
+    private readonly safetyTools: McpSafetyTools,
     private readonly accountListResource: McpAccountListResource,
     private readonly categoryTreeResource: McpCategoryTreeResource,
     private readonly recentTransactionsResource: McpRecentTransactionsResource,
@@ -100,8 +104,15 @@ export class McpServerService {
           "",
           "## Writing data",
           "- create_transaction / create_transfer / update_transaction / set_transaction_status / clear_transaction / categorize_transaction.",
+          "- update_transaction_splits (replace splits), set_transaction_tags (replace tags), bulk_update_transactions (update many at once), unreconcile_transaction.",
           "- post_scheduled_transaction converts a due bill/deposit into a real transaction; skip_scheduled_transaction skips one occurrence.",
-          "- All writes require 'write' scope, are HTML-sanitized, are rate-limited (50/day per user), and support dryRun=true to preview first.",
+          "- Accounts: update_account / close_account / reopen_account.",
+          "- Categories: create_category / update_category / reassign_category_transactions.",
+          "- Payees: create_payee / update_payee / merge_payees (requires confirmMerge=true) / reactivate_payee.",
+          "- Tags: create_tag / update_tag.",
+          "- Safety net: undo_last_action / redo_action / get_action_history — reverse a mistaken change.",
+          "- No tool deletes data except merge_payees (which removes the source payee and requires an explicit confirmMerge=true).",
+          "- All writes require 'write' scope, are HTML-sanitized, are rate-limited (50/day per user), and most support dryRun=true to preview first.",
         ].join("\n"),
         capabilities: {
           logging: {},
@@ -123,6 +134,8 @@ export class McpServerService {
     this.calculateTools.register(server);
     this.budgetsTools.register(server, resolve);
     this.planningTools.register(server, resolve);
+    this.tagsTools.register(server, resolve);
+    this.safetyTools.register(server, resolve);
 
     this.accountListResource.register(server, resolve);
     this.categoryTreeResource.register(server, resolve);

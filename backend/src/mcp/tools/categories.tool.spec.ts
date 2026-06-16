@@ -11,6 +11,9 @@ describe("McpCategoriesTools", () => {
   beforeEach(() => {
     categoriesService = {
       getLlmCategories: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      reassignTransactions: jest.fn(),
     };
 
     tool = new McpCategoriesTools(categoriesService as any);
@@ -25,8 +28,8 @@ describe("McpCategoriesTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 1 tool", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(1);
+  it("should register 4 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(4);
   });
 
   describe("get_categories", () => {

@@ -7,6 +7,7 @@ describe("McpTransactionsTools", () => {
   let transactionsService: Record<string, jest.Mock>;
   let analyticsService: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
+  let tagsService: Record<string, jest.Mock>;
   let server: { registerTool: jest.Mock };
   let resolve: jest.MockedFunction<UserContextResolver>;
   const handlers: Record<string, (...args: any[]) => any> = {};
@@ -21,6 +22,9 @@ describe("McpTransactionsTools", () => {
       createTransfer: jest.fn(),
       updateStatus: jest.fn(),
       markCleared: jest.fn(),
+      updateSplits: jest.fn(),
+      bulkUpdate: jest.fn(),
+      unreconcile: jest.fn(),
     };
 
     analyticsService = {
@@ -35,10 +39,15 @@ describe("McpTransactionsTools", () => {
       findOne: jest.fn(),
     };
 
+    tagsService = {
+      setTransactionTags: jest.fn(),
+    };
+
     tool = new McpTransactionsTools(
       transactionsService as any,
       analyticsService as any,
       accountsService as any,
+      tagsService as any,
     );
 
     server = {
@@ -51,8 +60,8 @@ describe("McpTransactionsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 12 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(12);
+  it("should register 16 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(16);
   });
 
   describe("query_transactions", () => {
@@ -556,6 +565,7 @@ describe("McpTransactionsTools", () => {
         transactionsService as any,
         analyticsService as any,
         accountsService as any,
+        tagsService as any,
       );
       const freshHandlers: Record<string, (...args: any[]) => any> = {};
       const freshServer = {
@@ -609,6 +619,7 @@ describe("McpTransactionsTools", () => {
         transactionsService as any,
         analyticsService as any,
         accountsService as any,
+        tagsService as any,
       );
       const freshHandlers: Record<string, (...args: any[]) => any> = {};
       const freshServer = {

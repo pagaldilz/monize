@@ -11,6 +11,8 @@ import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
 import { McpPlanningTools } from "./tools/planning.tool";
+import { McpTagsTools } from "./tools/tags.tool";
+import { McpSafetyTools } from "./tools/safety.tool";
 import { McpAccountListResource } from "./resources/account-list.resource";
 import { McpCategoryTreeResource } from "./resources/category-tree.resource";
 import { McpRecentTransactionsResource } from "./resources/recent-transactions.resource";
@@ -44,6 +46,8 @@ describe("McpServerService", () => {
         { provide: McpCalculateTools, useValue: mockToolProvider },
         { provide: McpBudgetsTools, useValue: mockToolProvider },
         { provide: McpPlanningTools, useValue: mockToolProvider },
+        { provide: McpTagsTools, useValue: mockToolProvider },
+        { provide: McpSafetyTools, useValue: mockToolProvider },
         { provide: McpAccountListResource, useValue: mockResourceProvider },
         { provide: McpCategoryTreeResource, useValue: mockResourceProvider },
         {
@@ -94,7 +98,7 @@ describe("McpServerService", () => {
   it("should register all tools", () => {
     const resolver = jest.fn();
     service.createServer(resolver);
-    expect(mockToolProvider.register).toHaveBeenCalledTimes(11);
+    expect(mockToolProvider.register).toHaveBeenCalledTimes(13);
   });
 
   it("should register all resources", () => {

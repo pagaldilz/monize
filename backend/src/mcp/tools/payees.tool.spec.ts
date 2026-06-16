@@ -13,6 +13,9 @@ describe("McpPayeesTools", () => {
       findAll: jest.fn(),
       search: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+      mergePayees: jest.fn(),
+      reactivatePayee: jest.fn(),
     };
 
     tool = new McpPayeesTools(payeesService as any);
@@ -27,8 +30,8 @@ describe("McpPayeesTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 2 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(2);
+  it("should register 5 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(5);
   });
 
   describe("get_payees", () => {

@@ -11,6 +11,8 @@ import { BudgetsModule } from "../budgets/budgets.module";
 import { BuiltInReportsModule } from "../built-in-reports/built-in-reports.module";
 import { MonteCarloModule } from "../monte-carlo/monte-carlo.module";
 import { AiModule } from "../ai/ai.module";
+import { TagsModule } from "../tags/tags.module";
+import { ActionHistoryModule } from "../action-history/action-history.module";
 import { OAuthModule } from "../oauth/oauth.module";
 
 import { McpServerService } from "./mcp-server.service";
@@ -27,6 +29,8 @@ import { McpScheduledTools } from "./tools/scheduled.tool";
 import { McpCalculateTools } from "./tools/calculate.tool";
 import { McpBudgetsTools } from "./tools/budgets.tool";
 import { McpPlanningTools } from "./tools/planning.tool";
+import { McpTagsTools } from "./tools/tags.tool";
+import { McpSafetyTools } from "./tools/safety.tool";
 
 import { McpAccountListResource } from "./resources/account-list.resource";
 import { McpCategoryTreeResource } from "./resources/category-tree.resource";
@@ -52,6 +56,8 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     BuiltInReportsModule,
     MonteCarloModule,
     AiModule,
+    TagsModule,
+    ActionHistoryModule,
     OAuthModule,
   ],
   providers: [
@@ -67,6 +73,8 @@ import { McpSpendingAnalysisPrompt } from "./prompts/spending-analysis.prompt";
     McpCalculateTools,
     McpBudgetsTools,
     McpPlanningTools,
+    McpTagsTools,
+    McpSafetyTools,
     McpAccountListResource,
     McpCategoryTreeResource,
     McpRecentTransactionsResource,

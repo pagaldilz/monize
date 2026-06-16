@@ -14,6 +14,9 @@ describe("McpAccountsTools", () => {
       findOne: jest.fn(),
       getSummary: jest.fn(),
       getLlmBalances: jest.fn(),
+      update: jest.fn(),
+      close: jest.fn(),
+      reopen: jest.fn(),
     };
 
     tool = new McpAccountsTools(accountsService as any);
@@ -28,8 +31,8 @@ describe("McpAccountsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 3 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(3);
+  it("should register 6 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(6);
   });
 
   describe("get_account_balances", () => {

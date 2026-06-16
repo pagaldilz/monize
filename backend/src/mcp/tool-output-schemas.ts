@@ -752,6 +752,174 @@ export const getAiInsightsOutput = {
 };
 
 // ---------------------------------------------------------------------------
+// Batch 2: update/create tools (no deletes)
+// ---------------------------------------------------------------------------
+
+// transactions.tool.ts (Phase 1)
+export const updateTransactionSplitsOutput = {
+  dryRun: bool.optional(),
+  preview: z
+    .object({
+      transactionId: str.optional(),
+      splitCount: num.optional(),
+      splits: z
+        .array(
+          z.object({
+            amount: num,
+            categoryId: strNull.optional(),
+            transferAccountId: strNull.optional(),
+            memo: strNull.optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
+  message: str.optional(),
+  transactionId: str.optional(),
+  splitCount: num.optional(),
+};
+
+export const setTransactionTagsOutput = {
+  transactionId: str,
+  tagIds: z.array(str),
+  message: str,
+};
+
+export const bulkUpdateTransactionsOutput = {
+  dryRun: bool.optional(),
+  matchCount: num.optional(),
+  message: str.optional(),
+  updated: num.optional(),
+  skipped: num.optional(),
+  skippedReasons: z.array(str).optional(),
+};
+
+export const unreconcileTransactionOutput = {
+  id: str,
+  status: str,
+  message: str,
+};
+
+// accounts.tool.ts (Phase 2)
+export const updateAccountOutput = {
+  dryRun: bool.optional(),
+  preview: z.record(z.string(), z.unknown()).optional(),
+  message: str.optional(),
+  id: str.optional(),
+  name: str.optional(),
+  currencyCode: str.optional(),
+  isClosed: bool.optional(),
+};
+
+export const closeAccountOutput = {
+  id: str,
+  name: str,
+  isClosed: bool,
+  message: str,
+};
+
+export const reopenAccountOutput = {
+  id: str,
+  name: str,
+  isClosed: bool,
+  message: str,
+};
+
+// categories.tool.ts (Phase 3)
+export const createCategoryOutput = {
+  id: str,
+  name: str,
+  isIncome: bool.optional(),
+  message: str,
+};
+
+export const updateCategoryOutput = {
+  dryRun: bool.optional(),
+  preview: z.record(z.string(), z.unknown()).optional(),
+  message: str.optional(),
+  id: str.optional(),
+  name: str.optional(),
+};
+
+export const reassignCategoryTransactionsOutput = {
+  fromCategoryId: str,
+  toCategoryId: strNull,
+  transactionsUpdated: num,
+  splitsUpdated: num,
+  scheduledUpdated: num,
+  message: str,
+};
+
+// payees.tool.ts (Phase 4)
+export const updatePayeeOutput = {
+  dryRun: bool.optional(),
+  preview: z.record(z.string(), z.unknown()).optional(),
+  message: str.optional(),
+  id: str.optional(),
+  name: str.optional(),
+  isActive: bool.optional(),
+};
+
+export const mergePayeesOutput = {
+  targetPayeeId: str,
+  sourcePayeeId: str,
+  transactionsMigrated: num,
+  aliasAdded: bool,
+  sourcePayeeDeleted: bool,
+  message: str,
+};
+
+export const reactivatePayeeOutput = {
+  id: str,
+  name: str,
+  isActive: bool,
+  message: str,
+};
+
+// tags.tool.ts (Phase 5)
+export const createTagOutput = {
+  id: str,
+  name: str,
+  message: str,
+};
+
+export const updateTagOutput = {
+  id: str,
+  name: str,
+  message: str,
+};
+
+// safety.tool.ts (Phase 6)
+export const undoLastActionOutput = {
+  undone: bool,
+  description: str.optional(),
+  entityType: str.optional(),
+  action: str.optional(),
+  message: str,
+};
+
+export const redoActionOutput = {
+  redone: bool,
+  description: str.optional(),
+  entityType: str.optional(),
+  action: str.optional(),
+  message: str,
+};
+
+export const getActionHistoryOutput = {
+  items: z.array(
+    z.object({
+      id: str,
+      entityType: str,
+      action: str,
+      description: str,
+      isUndone: bool,
+      createdAt: str,
+    }),
+  ),
+};
+
+// ---------------------------------------------------------------------------
 // scheduled.tool.ts
 // ---------------------------------------------------------------------------
 
