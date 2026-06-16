@@ -72,6 +72,16 @@ import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled
     AiInsightsController,
     AiForecastController,
   ],
-  exports: [AiService, AiUsageService, AiEncryptionService, AiInsightsService],
+  exports: [
+    AiService,
+    AiUsageService,
+    AiEncryptionService,
+    AiInsightsService,
+    // Used by the AiAgentModule's agentic loop to build the same financial
+    // system prompt the AI Assistant uses. Exported (rather than re-provided
+    // in AiAgentModule) so there's a single instance and a single source of
+    // truth for the prompt format.
+    FinancialContextBuilder,
+  ],
 })
 export class AiModule {}
