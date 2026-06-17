@@ -36,6 +36,9 @@ describe("McpInvestmentsTools", () => {
     securitiesService = {
       search: jest.fn(),
       findOne: jest.fn(),
+      findOneBySymbolOrNull: jest.fn(),
+      create: jest.fn(),
+      findOrCreate: jest.fn(),
     };
 
     securityPriceService = {
@@ -65,8 +68,8 @@ describe("McpInvestmentsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 12 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(12);
+  it("should register 13 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(13);
   });
 
   describe("get_portfolio_summary", () => {
@@ -361,6 +364,178 @@ describe("McpInvestmentsTools", () => {
 
       const result = await handlers["get_holding_details"](
         {},
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("create_security", () => {
+    it("requires write scope", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+
+      const result = await handlers["create_security"](
+        { symbol: "AAPL", name: "Apple", currencyCode: "USD" },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+      expect(securitiesService.findOrCreate).not.toHaveBeenCalled();
+    });
+
+    it("dry-run returns the existing record when the symbol is present", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securitiesService.findOneBySymbolOrNull.mockResolvedValue({
+        id: "sec-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK",
+        currencyCode: "USD",
+        exchange: "NASDAQ",
+      });
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "aapl",
+          name: "Apple",
+          currencyCode: "USD",
+          dryRun: true,
+        },
+        { sessionId: "s1" },
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.created).toBe(false);
+      expect(parsed.existing.symbol).toBe("AAPL");
+      // Dry-run must not consume the write quota or insert.
+      expect(securitiesService.findOrCreate).not.toHaveBeenCalled();
+    });
+
+    it("dry-run previews a create when the symbol is absent", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securitiesService.findOneBySymbolOrNull.mockResolvedValue(null);
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "MSFT",
+          name: "Microsoft Corp",
+          currencyCode: "usd",
+          securityType: "STOCK",
+          dryRun: true,
+        },
+        { sessionId: "s1" },
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.created).toBe(true);
+      expect(parsed.preview.currencyCode).toBe("USD");
+      expect(securitiesService.findOrCreate).not.toHaveBeenCalled();
+    });
+
+    it("delegates to findOrCreate on the idempotent path (default)", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securitiesService.findOrCreate.mockResolvedValue({
+        id: "sec-2",
+        symbol: "MSFT",
+        name: "Microsoft Corp",
+        securityType: "STOCK",
+        currencyCode: "USD",
+        exchange: "NASDAQ",
+        isActive: true,
+        isFavourite: false,
+        _created: true,
+      });
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "MSFT",
+          name: "Microsoft Corp",
+          currencyCode: "USD",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(securitiesService.findOrCreate).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ symbol: "MSFT", currencyCode: "USD" }),
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.created).toBe(true);
+      expect(parsed.id).toBe("sec-2");
+    });
+
+    it("returns created=false when findOrCreate surfaces an existing record", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securitiesService.findOrCreate.mockResolvedValue({
+        id: "sec-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK",
+        currencyCode: "USD",
+        exchange: "NASDAQ",
+        isActive: true,
+        isFavourite: false,
+        _created: false,
+      });
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "aapl",
+          name: "Apple",
+          currencyCode: "USD",
+        },
+        { sessionId: "s1" },
+      );
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.created).toBe(false);
+      expect(parsed.symbol).toBe("AAPL");
+    });
+
+    it("delegates to create() with onConflict:'error' in strict mode", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securitiesService.create.mockResolvedValue({
+        id: "sec-3",
+        symbol: "TSLA",
+        name: "Tesla Inc.",
+        securityType: "STOCK",
+        currencyCode: "USD",
+        isActive: true,
+        isFavourite: false,
+      });
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "TSLA",
+          name: "Tesla Inc.",
+          currencyCode: "USD",
+          onConflict: "error",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(securitiesService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ symbol: "TSLA" }),
+        { onConflict: "error" },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.created).toBe(true);
+    });
+
+    it("surfaces a conflict in strict mode as a safe error", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      const conflict = new (require("@nestjs/common").ConflictException)(
+        "already exists",
+      );
+      securitiesService.create.mockRejectedValue(conflict);
+
+      const result = await handlers["create_security"](
+        {
+          symbol: "AAPL",
+          name: "Apple",
+          currencyCode: "USD",
+          onConflict: "error",
+        },
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);

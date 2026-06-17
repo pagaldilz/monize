@@ -157,6 +157,144 @@ describe("SecuritiesService", () => {
         }),
       );
     });
+
+    it("normalizes the symbol before persisting and checking conflicts", async () => {
+      securitiesRepository.findOne.mockResolvedValue(null);
+
+      await service.create("user-1", {
+        symbol: " brk-b ",
+        name: "Berkshire Hathaway B",
+        securityType: "STOCK",
+        currencyCode: "USD",
+      });
+
+      expect(securitiesRepository.findOne).toHaveBeenCalledWith({
+        where: { symbol: "BRK.B", userId: "user-1" },
+      });
+      expect(securitiesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ symbol: "BRK.B", userId: "user-1" }),
+      );
+    });
+
+    it("detects a duplicate via its normalized form (BRK-B matches stored BRK.B)", async () => {
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        symbol: "BRK.B",
+      });
+
+      await expect(
+        service.create("user-1", {
+          symbol: "brk-b",
+          name: "Berkshire B",
+          securityType: "STOCK",
+          currencyCode: "USD",
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    describe("onConflict: 'return' (idempotent)", () => {
+      it("returns the existing security instead of throwing", async () => {
+        const existing = { ...mockSecurity, symbol: "AAPL" };
+        securitiesRepository.findOne.mockResolvedValue(existing);
+
+        const result = await service.create(
+          "user-1",
+          {
+            symbol: "aapl",
+            name: "Apple Inc.",
+            securityType: "STOCK",
+            currencyCode: "USD",
+          },
+          { onConflict: "return" },
+        );
+
+        expect(result).toEqual(existing);
+        // Must NOT have attempted an insert.
+        expect(securitiesRepository.create).not.toHaveBeenCalled();
+        expect(securitiesRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("skips action history and price backfill when returning existing", async () => {
+        securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+
+        await service.create(
+          "user-1",
+          {
+            symbol: "AAPL",
+            name: "Apple Inc.",
+            securityType: "STOCK",
+            currencyCode: "USD",
+          },
+          { onConflict: "return" },
+        );
+
+        expect(mockActionHistoryService.record).not.toHaveBeenCalled();
+        expect(mockSecurityPriceService.backfillSecurity).not.toHaveBeenCalled();
+      });
+
+      it("still creates normally when no duplicate exists", async () => {
+        securitiesRepository.findOne.mockResolvedValue(null);
+
+        await service.create(
+          "user-1",
+          {
+            symbol: "MSFT",
+            name: "Microsoft Corp",
+            securityType: "STOCK",
+            currencyCode: "USD",
+          },
+          { onConflict: "return" },
+        );
+
+        expect(securitiesRepository.save).toHaveBeenCalled();
+        expect(mockActionHistoryService.record).toHaveBeenCalled();
+      });
+    });
+
+    describe("findOrCreate", () => {
+      it("returns the existing record with _created:false when the symbol exists", async () => {
+        const existing = { ...mockSecurity, symbol: "BRK.B" };
+        securitiesRepository.findOne.mockResolvedValue(existing);
+
+        const result = await service.findOrCreate("user-1", {
+          symbol: "brk-b",
+          name: "Berkshire B",
+          securityType: "STOCK",
+          currencyCode: "USD",
+        });
+
+        expect(result).toEqual({ ...existing, _created: false });
+        expect(securitiesRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("inserts and returns the new record with _created:true when absent", async () => {
+        securitiesRepository.findOne.mockResolvedValue(null);
+
+        const result = await service.findOrCreate("user-1", {
+          symbol: "msft",
+          name: "Microsoft Corp",
+          securityType: "STOCK",
+          currencyCode: "USD",
+        });
+
+        expect(result._created).toBe(true);
+        expect(result.symbol).toBe("MSFT");
+        expect(securitiesRepository.save).toHaveBeenCalled();
+      });
+
+      it("never throws on a duplicate", async () => {
+        securitiesRepository.findOne.mockResolvedValue(mockSecurity);
+
+        await expect(
+          service.findOrCreate("user-1", {
+            symbol: "AAPL",
+            name: "Apple",
+            securityType: "STOCK",
+            currencyCode: "USD",
+          }),
+        ).resolves.toEqual(expect.objectContaining({ _created: false }));
+      });
+    });
   });
 
   describe("findAll", () => {

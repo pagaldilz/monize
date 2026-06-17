@@ -20,6 +20,7 @@ import {
   safeToolError,
 } from "../mcp-context";
 import { McpWriteLimiter } from "../mcp-write-limiter";
+import { stripHtml } from "../../common/sanitization.util";
 import {
   getPortfolioSummaryOutput,
   queryInvestmentTransactionsOutput,
@@ -33,8 +34,9 @@ import {
   getSecurityHistoryOutput,
   searchSecuritiesOutput,
   refreshSecurityPricesOutput,
+  createSecurityOutput,
 } from "../tool-output-schemas";
-import { READ_ONLY, UPDATE } from "../mcp-annotations";
+import { READ_ONLY, UPDATE, CREATE } from "../mcp-annotations";
 
 const INTRADAY_RANGES = ["1d", "1w", "1m"] as const;
 
@@ -572,6 +574,224 @@ export class McpInvestmentsTools {
           this.writeLimiter.record(ctx.userId, "refresh_security_prices");
 
           return toolResult(result);
+        } catch (err: unknown) {
+          return safeToolError(err);
+        }
+      },
+    );
+
+    server.registerTool(
+      "create_security",
+      {
+        title: "Create security",
+        annotations: CREATE,
+        description:
+          "Add a security (stock / ETF / mutual fund / bond / etc.) to the user's catalog so it can be tracked, priced, and held in investment accounts. Requires symbol + name + currencyCode; optionally set securityType, exchange, quoteProvider, msnInstrumentId, isActive, isFavourite. Idempotent by default: if a security with the same (normalized) symbol already exists for the user, it is returned as success with created=false instead of erroring — variant forms like 'aapl', 'BRK-B', and 'BRK B' all normalize to the same record ('AAPL', 'BRK.B'). Pass onConflict='error' to opt into strict duplicate-rejection. Supports dryRun=true to preview create-vs-return-existing without writing.",
+        inputSchema: {
+          symbol: z
+            .string()
+            .min(1)
+            .max(20)
+            .describe(
+              "Ticker symbol (e.g. AAPL, BRK.B). Normalized to uppercase with separators unified, so 'brk-b' and 'BRK B' both become 'BRK.B'.",
+            ),
+          name: z.string().max(255).describe("Full security name"),
+          currencyCode: z
+            .string()
+            .length(3)
+            .describe("ISO 4217 currency code (e.g. USD, CAD)"),
+          securityType: z
+            .string()
+            .max(50)
+            .optional()
+            .describe(
+              "Free-form type (e.g. STOCK, ETF, MUTUAL_FUND, BOND, OPTION, CRYPTO, OTHER).",
+            ),
+          exchange: z
+            .string()
+            .max(50)
+            .optional()
+            .describe("Exchange (e.g. NASDAQ, NYSE, TSX)."),
+          isActive: z
+            .boolean()
+            .optional()
+            .describe("Whether the security is active (default true)."),
+          isFavourite: z
+            .boolean()
+            .optional()
+            .describe("Pin to the dashboard Favourite Securities widget."),
+          quoteProvider: z
+            .enum(["yahoo", "msn"])
+            .optional()
+            .describe(
+              "Per-security quote provider override. Omit to use the user default.",
+            ),
+          msnInstrumentId: z
+            .string()
+            .max(50)
+            .optional()
+            .describe("MSN Financial Instrument ID (advanced override)."),
+          onConflict: z
+            .enum(["return", "error"])
+            .optional()
+            .default("return")
+            .describe(
+              "What to do if a security with the same symbol already exists. 'return' (default) returns it as success with created=false; 'error' fails with a 409 conflict.",
+            ),
+          dryRun: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe(
+              "If true, preview the result (create vs. return-existing) without writing.",
+            ),
+        },
+        outputSchema: createSecurityOutput,
+      },
+      async (args, extra) => {
+        const ctx = resolve(extra.sessionId);
+        if (!ctx) return toolError("No user context");
+        const check = requireScope(ctx.scopes, "write");
+        if (check.error) return check.result;
+
+        const onConflict = args.onConflict ?? "return";
+
+        // Dry-run: look up the normalized symbol and report what would happen
+        // without writing or consuming the write quota.
+        if (args.dryRun) {
+          try {
+            const existing =
+              await this.securitiesService.findOneBySymbolOrNull(
+                ctx.userId,
+                args.symbol,
+              );
+            if (existing) {
+              return toolResult({
+                dryRun: true,
+                created: false,
+                existing: {
+                  id: existing.id,
+                  symbol: existing.symbol,
+                  name: existing.name,
+                  securityType: existing.securityType,
+                  currencyCode: existing.currencyCode,
+                  exchange: existing.exchange,
+                },
+                message: `Security "${existing.symbol}" already exists. No changes would be made.`,
+              });
+            }
+            return toolResult({
+              dryRun: true,
+              created: true,
+              preview: {
+                symbol: args.symbol,
+                name: args.name,
+                currencyCode: (args.currencyCode as string).toUpperCase(),
+                securityType: args.securityType,
+                exchange: args.exchange,
+                isActive: args.isActive,
+                isFavourite: args.isFavourite,
+                quoteProvider: args.quoteProvider,
+                msnInstrumentId: args.msnInstrumentId,
+              },
+              message:
+                "Would create this security. Call again with dryRun=false to apply.",
+            });
+          } catch (err: unknown) {
+            return safeToolError(err);
+          }
+        }
+
+        const limitCheck = this.writeLimiter.checkLimit(ctx.userId);
+        if (!limitCheck.allowed) {
+          return toolError(
+            `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
+          );
+        }
+
+        try {
+          if (onConflict === "return") {
+            // Idempotent: returns existing (created=false) or inserts (created=true).
+            const result = await this.securitiesService.findOrCreate(
+              ctx.userId,
+              {
+                symbol: args.symbol,
+                name: stripHtml(args.name) as string,
+                currencyCode: (args.currencyCode as string).toUpperCase(),
+                ...(args.securityType !== undefined && {
+                  securityType: stripHtml(args.securityType),
+                }),
+                ...(args.exchange !== undefined && {
+                  exchange: stripHtml(args.exchange),
+                }),
+                ...(args.isActive !== undefined && { isActive: args.isActive }),
+                ...(args.isFavourite !== undefined && {
+                  isFavourite: args.isFavourite,
+                }),
+                ...(args.quoteProvider !== undefined && {
+                  quoteProvider: args.quoteProvider,
+                }),
+                ...(args.msnInstrumentId !== undefined && {
+                  msnInstrumentId: stripHtml(args.msnInstrumentId),
+                }),
+              },
+            );
+            this.writeLimiter.record(ctx.userId, "create_security");
+            return toolResult({
+              id: result.id,
+              symbol: result.symbol,
+              name: result.name,
+              securityType: result.securityType,
+              currencyCode: result.currencyCode,
+              exchange: result.exchange,
+              isActive: result.isActive,
+              isFavourite: result.isFavourite,
+              created: result._created,
+              message: result._created
+                ? "Security created successfully."
+                : `Security "${result.symbol}" already exists; returned the existing record.`,
+            });
+          }
+
+          // Strict mode: delegate to create(), which throws ConflictException on dup.
+          const created = await this.securitiesService.create(
+            ctx.userId,
+            {
+              symbol: args.symbol,
+              name: stripHtml(args.name) as string,
+              currencyCode: (args.currencyCode as string).toUpperCase(),
+              ...(args.securityType !== undefined && {
+                securityType: stripHtml(args.securityType),
+              }),
+              ...(args.exchange !== undefined && {
+                exchange: stripHtml(args.exchange),
+              }),
+              ...(args.isActive !== undefined && { isActive: args.isActive }),
+              ...(args.isFavourite !== undefined && {
+                isFavourite: args.isFavourite,
+              }),
+              ...(args.quoteProvider !== undefined && {
+                quoteProvider: args.quoteProvider,
+              }),
+              ...(args.msnInstrumentId !== undefined && {
+                msnInstrumentId: stripHtml(args.msnInstrumentId),
+              }),
+            },
+            { onConflict: "error" },
+          );
+          this.writeLimiter.record(ctx.userId, "create_security");
+          return toolResult({
+            id: created.id,
+            symbol: created.symbol,
+            name: created.name,
+            securityType: created.securityType,
+            currencyCode: created.currencyCode,
+            exchange: created.exchange,
+            isActive: created.isActive,
+            isFavourite: created.isFavourite,
+            created: true,
+            message: "Security created successfully.",
+          });
         } catch (err: unknown) {
           return safeToolError(err);
         }

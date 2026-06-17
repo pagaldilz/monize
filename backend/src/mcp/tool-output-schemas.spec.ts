@@ -484,6 +484,74 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     schema: schemas.getBudgetStatusOutput,
     raw: { error: "No budget found", availableBudgets: ["Main", "Vacation"] },
   },
+  {
+    name: "createSecurityOutput (newly created)",
+    schema: schemas.createSecurityOutput,
+    raw: {
+      id: "sec-1",
+      symbol: "AAPL",
+      name: "Apple Inc.",
+      securityType: "STOCK",
+      currencyCode: "USD",
+      exchange: "NASDAQ",
+      isActive: true,
+      isFavourite: false,
+      created: true,
+      message: "Security created successfully.",
+    },
+  },
+  {
+    name: "createSecurityOutput (idempotent existing return)",
+    schema: schemas.createSecurityOutput,
+    raw: {
+      id: "sec-1",
+      symbol: "BRK.B",
+      name: "Berkshire Hathaway B",
+      securityType: "STOCK",
+      currencyCode: "USD",
+      exchange: null,
+      isActive: true,
+      isFavourite: false,
+      created: false,
+      message: 'Security "BRK.B" already exists; returned the existing record.',
+    },
+  },
+  {
+    name: "createSecurityOutput (dry-run would-create preview)",
+    schema: schemas.createSecurityOutput,
+    raw: {
+      dryRun: true,
+      created: true,
+      preview: {
+        symbol: "MSFT",
+        name: "Microsoft Corp",
+        currencyCode: "USD",
+        securityType: "STOCK",
+        exchange: "NASDAQ",
+        isActive: true,
+        isFavourite: false,
+      },
+      message:
+        "Would create this security. Call again with dryRun=false to apply.",
+    },
+  },
+  {
+    name: "createSecurityOutput (dry-run already-exists)",
+    schema: schemas.createSecurityOutput,
+    raw: {
+      dryRun: true,
+      created: false,
+      existing: {
+        id: "sec-9",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK",
+        currencyCode: "USD",
+        exchange: "NASDAQ",
+      },
+      message: 'Security "AAPL" already exists. No changes would be made.',
+    },
+  },
 ];
 
 describe("tool-output-schemas", () => {

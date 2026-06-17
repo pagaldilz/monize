@@ -648,6 +648,27 @@ export const refreshSecurityPricesOutput = {
   ),
 };
 
+// create_security: insert or (idempotently) return an existing security.
+// `created` distinguishes a freshly-inserted row (true) from an existing one
+// surfaced via onConflict='return' (false). The dry-run branch surfaces
+// `preview` (would-create) or `existing` (already-present) instead of writing.
+export const createSecurityOutput = {
+  id: str.optional(),
+  symbol: str.optional(),
+  name: str.optional(),
+  securityType: strNull.optional(),
+  currencyCode: str.optional(),
+  exchange: strNull.optional(),
+  isActive: bool.optional(),
+  isFavourite: bool.optional(),
+  created: bool,
+  // Dry-run branches (mutually exclusive with the created row above).
+  dryRun: bool.optional(),
+  preview: z.record(z.string(), z.unknown()).optional(),
+  existing: z.record(z.string(), z.unknown()).optional(),
+  message: str,
+};
+
 // ---------------------------------------------------------------------------
 // planning.tool.ts
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ const WRITE_TOOLS = new Set([
   "create_account",
   "create_transaction",
   "create_payee",
+  "create_security",
   "categorize_transaction",
   "create_transfer",
   "post_scheduled_transaction",
@@ -69,7 +70,7 @@ const IDEMPOTENT_WRITES = new Set([
   "redo_action",
 ]);
 
-const EXPECTED_TOOL_COUNT = 66;
+const EXPECTED_TOOL_COUNT = 67;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;

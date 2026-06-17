@@ -15,6 +15,7 @@ import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
 import { SecurityPriceService } from "./security-price.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { normalizeSymbol } from "./security-symbol.util";
 
 export interface FavouriteSecurityQuote {
   securityId: string;
@@ -25,6 +26,28 @@ export interface FavouriteSecurityQuote {
   previousPrice: number | null;
   dailyChange: number;
   dailyChangePercent: number;
+}
+
+/**
+ * Conflict policy for {@link SecuritiesService.create}.
+ * - `"error"` (default): throw `ConflictException` if the (normalized) symbol
+ *   already exists for the user. This is the legacy behavior used by the REST
+ *   `POST /securities` endpoint.
+ * - `"return"`: if the (normalized) symbol already exists, return the existing
+ *   record instead of throwing. Used by the idempotent MCP `create_security`
+ *   tool so autonomous agents don't fail on re-runs.
+ */
+export type SecurityOnConflict = "error" | "return";
+
+/**
+ * Result of an idempotent create ({@link SecuritiesService.findOrCreate}).
+ * `_created` distinguishes a freshly-inserted row from an existing one
+ * returned because the symbol was already present.
+ */
+export type SecurityUpsertResult = Security & { _created: boolean };
+
+export interface SecurityCreateOptions {
+  onConflict?: SecurityOnConflict;
 }
 
 @Injectable()
@@ -45,24 +68,41 @@ export class SecuritiesService {
   async create(
     userId: string,
     createSecurityDto: CreateSecurityDto,
+    options?: SecurityCreateOptions,
   ): Promise<Security> {
+    const onConflict = options?.onConflict ?? "error";
+
+    // Canonicalize the symbol so variant forms (e.g. "aapl", "BRK-B",
+    // "BRK B") all collapse to one stored value ("AAPL", "BRK.B"). This makes
+    // the duplicate check below catch equivalent tickers, not just exact
+    // string matches.
+    const normalizedSymbol = normalizeSymbol(createSecurityDto.symbol);
+    const createDto: CreateSecurityDto = {
+      ...createSecurityDto,
+      symbol: normalizedSymbol,
+    };
+
     // Check if symbol already exists for this user
     const existing = await this.securitiesRepository.findOne({
-      where: { symbol: createSecurityDto.symbol, userId },
+      where: { symbol: normalizedSymbol, userId },
     });
 
     if (existing) {
+      if (onConflict === "return") {
+        // Idempotent mode: surface the existing record instead of failing.
+        return existing;
+      }
       throw new ConflictException(
         tr(
           "errors.securities.symbolAlreadyExists",
-          `Security with symbol ${createSecurityDto.symbol} already exists`,
-          { symbol: createSecurityDto.symbol },
+          `Security with symbol ${normalizedSymbol} already exists`,
+          { symbol: normalizedSymbol },
         ),
       );
     }
 
     const security = this.securitiesRepository.create({
-      ...createSecurityDto,
+      ...createDto,
       userId,
     });
     const saved = await this.securitiesRepository.save(security);
@@ -85,6 +125,32 @@ export class SecuritiesService {
     });
 
     return saved;
+  }
+
+  /**
+   * Idempotent create-or-return for the MCP `create_security` tool. If the
+   * (normalized) symbol already exists for the user, returns it with
+   * `_created: false`; otherwise inserts a new row and returns it with
+   * `_created: true`. Never throws on a duplicate. Backfill and action
+   * history are only triggered for genuinely new rows (via {@link create}).
+   *
+   * The existence check runs once here, before delegating to {@link create},
+   * so `_created` is known with certainty rather than guessed from the
+   * returned row.
+   */
+  async findOrCreate(
+    userId: string,
+    createSecurityDto: CreateSecurityDto,
+  ): Promise<SecurityUpsertResult> {
+    const normalizedSymbol = normalizeSymbol(createSecurityDto.symbol);
+    const existing = await this.securitiesRepository.findOne({
+      where: { symbol: normalizedSymbol, userId },
+    });
+    if (existing) {
+      return { ...existing, _created: false };
+    }
+    const created = await this.create(userId, createSecurityDto);
+    return { ...created, _created: true };
   }
 
   async findAll(
@@ -144,19 +210,36 @@ export class SecuritiesService {
   }
 
   async findBySymbol(userId: string, symbol: string): Promise<Security> {
+    const normalized = normalizeSymbol(symbol);
     const security = await this.securitiesRepository.findOne({
-      where: { symbol, userId },
+      where: { symbol: normalized, userId },
     });
     if (!security) {
       throw new NotFoundException(
         tr(
           "errors.securities.notFoundBySymbol",
-          `Security with symbol ${symbol} not found`,
-          { symbol },
+          `Security with symbol ${normalized} not found`,
+          { symbol: normalized },
         ),
       );
     }
     return security;
+  }
+
+  /**
+   * Non-throwing variant of {@link findBySymbol}. Returns the security whose
+   * (normalized) symbol matches, or `null` when none exists. Used by the MCP
+   * `create_security` dry-run preview to decide create-vs-return-existing
+   * without surfacing a 404.
+   */
+  async findOneBySymbolOrNull(
+    userId: string,
+    symbol: string,
+  ): Promise<Security | null> {
+    const normalized = normalizeSymbol(symbol);
+    return this.securitiesRepository.findOne({
+      where: { symbol: normalized, userId },
+    });
   }
 
   async update(
@@ -167,44 +250,50 @@ export class SecuritiesService {
     const security = await this.findOne(userId, id);
     const beforeData = { ...security };
 
+    // Normalize the incoming symbol (if provided) so conflicts and the stored
+    // value both use the canonical form.
+    const normalizedUpdate: UpdateSecurityDto = updateSecurityDto.symbol
+      ? { ...updateSecurityDto, symbol: normalizeSymbol(updateSecurityDto.symbol) }
+      : updateSecurityDto;
+
     // Check for symbol conflicts if updating symbol
     if (
-      updateSecurityDto.symbol &&
-      updateSecurityDto.symbol !== security.symbol
+      normalizedUpdate.symbol &&
+      normalizedUpdate.symbol !== security.symbol
     ) {
       const existing = await this.securitiesRepository.findOne({
-        where: { symbol: updateSecurityDto.symbol, userId },
+        where: { symbol: normalizedUpdate.symbol, userId },
       });
       if (existing) {
         throw new ConflictException(
           tr(
             "errors.securities.symbolAlreadyExists",
-            `Security with symbol ${updateSecurityDto.symbol} already exists`,
-            { symbol: updateSecurityDto.symbol },
+            `Security with symbol ${normalizedUpdate.symbol} already exists`,
+            { symbol: normalizedUpdate.symbol },
           ),
         );
       }
     }
 
     // SECURITY: Explicit property mapping instead of Object.assign to prevent mass assignment
-    if (updateSecurityDto.symbol !== undefined)
-      security.symbol = updateSecurityDto.symbol;
-    if (updateSecurityDto.name !== undefined)
-      security.name = updateSecurityDto.name;
-    if (updateSecurityDto.securityType !== undefined)
-      security.securityType = updateSecurityDto.securityType;
-    if (updateSecurityDto.exchange !== undefined)
-      security.exchange = updateSecurityDto.exchange;
-    if (updateSecurityDto.currencyCode !== undefined)
-      security.currencyCode = updateSecurityDto.currencyCode;
-    if (updateSecurityDto.isActive !== undefined)
-      security.isActive = updateSecurityDto.isActive;
-    if (updateSecurityDto.isFavourite !== undefined)
-      security.isFavourite = updateSecurityDto.isFavourite;
-    if (updateSecurityDto.quoteProvider !== undefined)
-      security.quoteProvider = updateSecurityDto.quoteProvider ?? null;
-    if (updateSecurityDto.msnInstrumentId !== undefined)
-      security.msnInstrumentId = updateSecurityDto.msnInstrumentId ?? null;
+    if (normalizedUpdate.symbol !== undefined)
+      security.symbol = normalizedUpdate.symbol;
+    if (normalizedUpdate.name !== undefined)
+      security.name = normalizedUpdate.name;
+    if (normalizedUpdate.securityType !== undefined)
+      security.securityType = normalizedUpdate.securityType;
+    if (normalizedUpdate.exchange !== undefined)
+      security.exchange = normalizedUpdate.exchange;
+    if (normalizedUpdate.currencyCode !== undefined)
+      security.currencyCode = normalizedUpdate.currencyCode;
+    if (normalizedUpdate.isActive !== undefined)
+      security.isActive = normalizedUpdate.isActive;
+    if (normalizedUpdate.isFavourite !== undefined)
+      security.isFavourite = normalizedUpdate.isFavourite;
+    if (normalizedUpdate.quoteProvider !== undefined)
+      security.quoteProvider = normalizedUpdate.quoteProvider ?? null;
+    if (normalizedUpdate.msnInstrumentId !== undefined)
+      security.msnInstrumentId = normalizedUpdate.msnInstrumentId ?? null;
 
     // The user explicitly opted into a quote source — auto-clear the
     // skipPriceUpdates flag that QIF/OFX import sets on auto-generated
